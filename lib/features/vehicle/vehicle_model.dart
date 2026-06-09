@@ -1,10 +1,16 @@
 import 'package:fuel_efficiency_app/core/providers/local_storage_provider.dart';
+import 'package:fuel_efficiency_app/features/shared/app_enums.dart';
 
 class VehicleModel {
   const VehicleModel({
     required this.id,
     required this.name,
-    required this.fuelType,
+    required this.energyMode,
+    required this.vehicleType,
+    required this.makeModel,
+    required this.year,
+    this.manufacturerMpgClaim,
+    this.batteryKwhCapacity,
     this.odometer = 0,
   });
 
@@ -12,19 +18,40 @@ class VehicleModel {
 
   final String id;
   final String name;
-  final String fuelType;
+  final EnergyMode energyMode;
+  final String vehicleType;
+  final String makeModel;
+  final int year;
+  final double? manufacturerMpgClaim;
+  final double? batteryKwhCapacity;
   final double odometer;
 
   VehicleModel copyWith({
     String? id,
     String? name,
-    String? fuelType,
+    EnergyMode? energyMode,
+    String? vehicleType,
+    String? makeModel,
+    int? year,
+    double? manufacturerMpgClaim,
+    bool clearManufacturerClaim = false,
+    double? batteryKwhCapacity,
+    bool clearBatteryCapacity = false,
     double? odometer,
   }) {
     return VehicleModel(
       id: id ?? this.id,
       name: name ?? this.name,
-      fuelType: fuelType ?? this.fuelType,
+      energyMode: energyMode ?? this.energyMode,
+      vehicleType: vehicleType ?? this.vehicleType,
+      makeModel: makeModel ?? this.makeModel,
+      year: year ?? this.year,
+      manufacturerMpgClaim: clearManufacturerClaim
+          ? null
+          : manufacturerMpgClaim ?? this.manufacturerMpgClaim,
+      batteryKwhCapacity: clearBatteryCapacity
+          ? null
+          : batteryKwhCapacity ?? this.batteryKwhCapacity,
       odometer: odometer ?? this.odometer,
     );
   }
@@ -32,7 +59,12 @@ class VehicleModel {
   Map<String, dynamic> toJson() => {
         'id': id,
         'name': name,
-        'fuelType': fuelType,
+        'energyMode': energyMode.storageValue,
+        'vehicleType': vehicleType,
+        'makeModel': makeModel,
+        'year': year,
+        'manufacturerMpgClaim': manufacturerMpgClaim,
+        'batteryKwhCapacity': batteryKwhCapacity,
         'odometer': odometer,
       };
 
@@ -40,7 +72,15 @@ class VehicleModel {
     return VehicleModel(
       id: json['id'] as String,
       name: json['name'] as String,
-      fuelType: json['fuelType'] as String,
+      energyMode: EnergyMode.fromStorage(
+        json['energyMode'] as String? ?? 'fuel',
+      ),
+      vehicleType: json['vehicleType'] as String? ?? 'Car',
+      makeModel: json['makeModel'] as String? ?? (json['name'] as String),
+      year: (json['year'] as num?)?.toInt() ?? DateTime.now().year,
+      manufacturerMpgClaim:
+          (json['manufacturerMpgClaim'] as num?)?.toDouble(),
+      batteryKwhCapacity: (json['batteryKwhCapacity'] as num?)?.toDouble(),
       odometer: (json['odometer'] as num?)?.toDouble() ?? 0,
     );
   }

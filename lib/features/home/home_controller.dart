@@ -1,39 +1,47 @@
 import 'package:get/get.dart';
 import 'package:fuel_efficiency_app/app/routes/app_routes.dart';
-import 'package:fuel_efficiency_app/core/providers/local_storage_provider.dart';
 import 'package:fuel_efficiency_app/features/fuel/fuel_entry_model.dart';
+import 'package:fuel_efficiency_app/features/shared/app_data_controller.dart';
 import 'package:fuel_efficiency_app/features/vehicle/vehicle_model.dart';
 
 class HomeController extends GetxController {
-  HomeController(this._storage);
+  HomeController(this._data);
 
-  final LocalStorageProvider _storage;
+  final AppDataController _data;
 
-  final RxList<VehicleModel> vehicles = <VehicleModel>[].obs;
-  final RxList<FuelEntryModel> recentEntries = <FuelEntryModel>[].obs;
-  final RxBool isLoading = true.obs;
+  RxList<VehicleModel> get vehicles => _data.vehicles;
+  RxList<FuelEntryModel> get entries => _data.entries;
+  RxString get selectedVehicleId => _data.selectedVehicleId;
+  RxString get currencySymbol => _data.currencySymbol;
+  RxString get distanceUnit => _data.distanceUnit;
+  RxBool get isHydrated => _data.isHydrated;
 
-  @override
-  void onInit() {
-    super.onInit();
-    loadDashboard();
-  }
+  String get userName => _data.userName.value.isEmpty ? 'Driver' : _data.userName.value;
 
-  void loadDashboard() {
-    isLoading.value = true;
-    vehicles.assignAll(VehicleModel.loadAll(_storage));
-    recentEntries
-      ..assignAll(FuelEntryModel.loadAll(_storage))
-      ..sort((a, b) => b.date.compareTo(a.date));
-    if (recentEntries.length > 5) {
-      recentEntries.removeRange(5, recentEntries.length);
-    }
-    isLoading.value = false;
-  }
+  VehicleModel? get selectedVehicle => _data.selectedVehicle;
+
+  List<FuelEntryModel> get recentEntries =>
+      _data.selectedVehicleEntries.take(5).toList();
+
+  double get realMpg => _data.avgMpg;
+
+  double get claimedMpg => _data.claimedMpg;
+
+  double get monthlyFuelCost => _data.monthlyFuelCost;
+
+  double get avgCostPerDistance => _data.avgCostPerDistance;
+
+  double get realityPercent => _data.realityPercent;
+
+  double get differencePercent => _data.differencePercent;
 
   void goToFuel() => Get.toNamed(AppRoutes.fuel);
 
   void goToVehicle() => Get.toNamed(AppRoutes.vehicle);
 
   void goToSettings() => Get.toNamed(AppRoutes.settings);
+
+  Future<void> selectVehicle(String vehicleId) => _data.selectVehicle(vehicleId);
+
+  void refreshData() => _data.hydrate();
 }

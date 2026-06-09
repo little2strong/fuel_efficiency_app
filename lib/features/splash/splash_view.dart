@@ -10,24 +10,29 @@ class SplashView extends GetView<SplashController> {
   @override
   Widget build(BuildContext context) {
     return const Scaffold(
-      backgroundColor: AppColors.primary,
+      backgroundColor: Colors.white,
       body: Center(
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
             Icon(
-              Icons.local_gas_station,
+              Icons.speed_rounded,
               size: 72,
-              color: Colors.white,
+              color: AppColors.primary,
             ),
             SizedBox(height: 16),
             Text(
               AppConstants.appName,
               style: TextStyle(
-                color: Colors.white,
+                color: AppColors.textPrimary,
                 fontSize: 24,
                 fontWeight: FontWeight.bold,
               ),
+            ),
+            SizedBox(height: 6),
+            Text(
+              'Track real efficiency. See the real difference.',
+              style: TextStyle(color: AppColors.textSecondary),
             ),
           ],
         ),

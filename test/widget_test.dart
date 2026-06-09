@@ -20,6 +20,7 @@ void main() {
 
   setUp(() async {
     await GetStorage.init(AppConstants.storageBoxName);
+    await GetStorage(AppConstants.storageBoxName).erase();
     Get.testMode = true;
   });
 
@@ -31,8 +32,8 @@ void main() {
     await tester.pumpWidget(const FuelEfficiencyApp());
     await tester.pump();
 
-    expect(find.text('Fuel Efficiency'), findsOneWidget);
-    expect(find.byIcon(Icons.local_gas_station), findsOneWidget);
+    expect(find.text('Fuel Efficiency Calculator'), findsOneWidget);
+    expect(find.byIcon(Icons.speed_rounded), findsOneWidget);
 
     await tester.pump(AppConstants.splashDuration);
     await tester.pumpAndSettle();

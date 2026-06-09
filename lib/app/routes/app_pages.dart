@@ -4,6 +4,8 @@ import 'package:fuel_efficiency_app/features/fuel/fuel_binding.dart';
 import 'package:fuel_efficiency_app/features/fuel/fuel_view.dart';
 import 'package:fuel_efficiency_app/features/home/home_binding.dart';
 import 'package:fuel_efficiency_app/features/home/home_view.dart';
+import 'package:fuel_efficiency_app/features/onboarding/onboarding_binding.dart';
+import 'package:fuel_efficiency_app/features/onboarding/onboarding_view.dart';
 import 'package:fuel_efficiency_app/features/settings/settings_binding.dart';
 import 'package:fuel_efficiency_app/features/settings/settings_view.dart';
 import 'package:fuel_efficiency_app/features/splash/splash_binding.dart';
@@ -24,6 +26,11 @@ abstract final class AppPages {
       name: AppRoutes.home,
       page: HomeView.new,
       binding: HomeBinding(),
+    ),
+    GetPage(
+      name: AppRoutes.onboarding,
+      page: OnboardingView.new,
+      binding: OnboardingBinding(),
     ),
     GetPage(
       name: AppRoutes.fuel,
