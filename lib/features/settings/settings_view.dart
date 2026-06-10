@@ -1,7 +1,11 @@
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
-import 'package:fuel_efficiency_app/features/settings/settings_controller.dart';
+
 import 'package:fuel_efficiency_app/app/routes/app_routes.dart';
+import 'package:fuel_efficiency_app/core/utils/formatters.dart';
+import 'package:fuel_efficiency_app/core/values/app_colors.dart';
+import 'package:fuel_efficiency_app/core/widgets/app_card.dart';
+import 'package:fuel_efficiency_app/features/settings/settings_controller.dart';
 
 class SettingsView extends GetView<SettingsController> {
   const SettingsView({super.key});
@@ -11,108 +15,533 @@ class SettingsView extends GetView<SettingsController> {
     return Scaffold(
       appBar: AppBar(title: const Text('Settings')),
       body: ListView(
-        padding: const EdgeInsets.symmetric(vertical: 10),
+        padding: const EdgeInsets.fromLTRB(16, 8, 16, 24),
         children: [
-          ListTile(
-            leading: const Icon(Icons.info_outline),
-            title: const Text('App name'),
-            subtitle: Text(controller.appName),
-          ),
           Obx(
-            () => ListTile(
-              leading: const Icon(Icons.system_update_alt),
-              title: const Text('Version'),
-              subtitle: Text(controller.appVersion.value),
-            ),
-          ),
-          const Divider(),
-          Obx(
-            () => ListTile(
-              leading: const Icon(Icons.straighten),
-              title: const Text('Units'),
-              subtitle: Text(controller.distanceUnit.value),
-              trailing: DropdownButton<String>(
-                value: controller.distanceUnit.value,
-                items: const [
-                  DropdownMenuItem(value: 'Miles', child: Text('Miles')),
-                  DropdownMenuItem(value: 'Kilometers', child: Text('Kilometers')),
+            () => AppCard(
+              padding: const EdgeInsets.all(16),
+              child: Row(
+                children: [
+                  Container(
+                    height: 56,
+                    width: 56,
+                    decoration: const BoxDecoration(
+                      color: AppColors.primarySurface,
+                      shape: BoxShape.circle,
+                    ),
+                    child: const Icon(
+                      Icons.person_rounded,
+                      color: AppColors.primary,
+                      size: 30,
+                    ),
+                  ),
+                  const SizedBox(width: 14),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          controller.userName.value.isEmpty
+                              ? 'Driver'
+                              : controller.userName.value,
+                          style: Theme.of(context).textTheme.titleMedium,
+                        ),
+                        Text(
+                          controller.userEmail.value.isEmpty
+                              ? 'No email set'
+                              : controller.userEmail.value,
+                          style: Theme.of(context).textTheme.bodySmall,
+                        ),
+                      ],
+                    ),
+                  ),
+                  IconButton(
+                    onPressed: () => _editProfile(context),
+                    icon: const Icon(Icons.edit_rounded),
+                    tooltip: 'Edit profile',
+                  ),
                 ],
-                onChanged: (value) {
-                  if (value != null) {
-                    controller.setDistanceUnit(value);
-                  }
-                },
               ),
             ),
           ),
-          Obx(
-            () => ListTile(
-              leading: const Icon(Icons.payments_outlined),
-              title: const Text('Currency'),
-              subtitle: Text(controller.currencySymbol.value),
-              trailing: DropdownButton<String>(
-                value: controller.currencySymbol.value,
-                items: const [
-                  DropdownMenuItem(value: '\$', child: Text('\$')),
-                  DropdownMenuItem(value: '€', child: Text('€')),
-                  DropdownMenuItem(value: '£', child: Text('£')),
-                ],
-                onChanged: (value) {
-                  if (value != null) {
-                    controller.setCurrency(value);
-                  }
-                },
+          const SizedBox(height: 18),
+          _GroupTitle('Units'),
+          AppCard(
+            padding: EdgeInsets.zero,
+            child: Column(
+              children: [
+                Obx(
+                  () => _DropdownTile(
+                    icon: Icons.straighten_rounded,
+                    title: 'Distance Unit',
+                    value: controller.distanceUnit.value,
+                    options: const ['Miles', 'Kilometers'],
+                    onChanged: controller.setDistanceUnit,
+                  ),
+                ),
+                _divider(context),
+                Obx(
+                  () => _DropdownTile(
+                    icon: Icons.local_drink_rounded,
+                    title: 'Volume Unit',
+                    value: controller.volumeUnit.value,
+                    options: const ['Litres', 'Gallons'],
+                    onChanged: controller.setVolumeUnit,
+                  ),
+                ),
+                _divider(context),
+                Obx(
+                  () => _DropdownTile(
+                    icon: Icons.payments_rounded,
+                    title: 'Currency',
+                    value: controller.currencySymbol.value,
+                    options: const ['£', '\$', '€', '₹'],
+                    onChanged: controller.setCurrency,
+                  ),
+                ),
+              ],
+            ),
+          ),
+          const SizedBox(height: 18),
+          _GroupTitle('Energy Prices'),
+          AppCard(
+            padding: EdgeInsets.zero,
+            child: Obx(
+              () => _Tile(
+                icon: Icons.bolt_rounded,
+                title: 'Default Energy Prices',
+                subtitle:
+                    'Fuel ${Formatters.currency(controller.fuelPrice.value, controller.currencySymbol.value)}/L • '
+                    'Electricity ${Formatters.currency(controller.electricityPrice.value, controller.currencySymbol.value)}/kWh',
+                onTap: () => _editPrices(context),
               ),
             ),
           ),
-          const Divider(),
-          ListTile(
-            leading: const Icon(Icons.upload_file),
-            title: const Text('Data Export'),
-            subtitle: const Text('Export your data'),
-            onTap: controller.exportData,
+          const SizedBox(height: 18),
+          _GroupTitle('Appearance'),
+          AppCard(
+            padding: EdgeInsets.zero,
+            child: Column(
+              children: [
+                Obx(
+                  () => _SwitchTile(
+                    icon: Icons.dark_mode_rounded,
+                    title: 'Dark Mode',
+                    value: controller.isDarkMode,
+                    onChanged: controller.toggleDarkMode,
+                  ),
+                ),
+                _divider(context),
+                Obx(
+                  () => _SwitchTile(
+                    icon: Icons.notifications_rounded,
+                    title: 'Notifications',
+                    value: controller.notificationsEnabled.value,
+                    onChanged: controller.toggleNotifications,
+                  ),
+                ),
+              ],
+            ),
           ),
-          ListTile(
-            leading: const Icon(Icons.backup),
-            title: const Text('Backup & Restore'),
-            subtitle: const Text('Back up your data'),
-            onTap: controller.backupData,
+          const SizedBox(height: 18),
+          _GroupTitle('Data Management'),
+          AppCard(
+            padding: EdgeInsets.zero,
+            child: Column(
+              children: [
+                _Tile(
+                  icon: Icons.file_download_rounded,
+                  title: 'Export as JSON',
+                  subtitle: 'Share a full backup file',
+                  onTap: controller.exportJson,
+                ),
+                _divider(context),
+                _Tile(
+                  icon: Icons.table_view_rounded,
+                  title: 'Export as CSV',
+                  subtitle: 'Share entries as a spreadsheet',
+                  onTap: controller.exportCsv,
+                ),
+                _divider(context),
+                _Tile(
+                  icon: Icons.file_upload_rounded,
+                  title: 'Import Data',
+                  subtitle: 'Paste a JSON backup to restore',
+                  onTap: () => _importData(context),
+                ),
+                _divider(context),
+                _Tile(
+                  icon: Icons.backup_rounded,
+                  title: 'Backup & Restore',
+                  subtitle: 'Save a backup to this device',
+                  onTap: controller.backup,
+                ),
+              ],
+            ),
           ),
-          ListTile(
-            leading: const Icon(Icons.privacy_tip_outlined),
-            title: const Text('Privacy Policy'),
-            subtitle: const Text('Read privacy details'),
-            onTap: () {},
+          const SizedBox(height: 18),
+          _GroupTitle('About'),
+          AppCard(
+            padding: EdgeInsets.zero,
+            child: Column(
+              children: [
+                _Tile(
+                  icon: Icons.privacy_tip_rounded,
+                  title: 'Privacy Policy',
+                  subtitle: 'Your data stays on your device',
+                  onTap: () => _privacyDialog(context),
+                ),
+                _divider(context),
+                _Tile(
+                  icon: Icons.info_rounded,
+                  title: 'About App',
+                  subtitle: 'Version ${controller.appVersion}',
+                  onTap: () => _aboutDialog(context),
+                ),
+              ],
+            ),
           ),
-          ListTile(
-            leading: const Icon(Icons.info_outline),
-            title: const Text('About App'),
-            subtitle: const Text('Version and credits'),
-            onTap: () {},
-          ),
-          const SizedBox(height: 14),
-          Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 16),
-            child: FilledButton.tonal(
+          const SizedBox(height: 24),
+          SizedBox(
+            width: double.infinity,
+            child: FilledButton.tonalIcon(
+              style: FilledButton.styleFrom(
+                backgroundColor: AppColors.negative.withValues(alpha: 0.12),
+                foregroundColor: AppColors.negative,
+              ),
               onPressed: () async {
                 await controller.logout();
                 Get.offAllNamed(AppRoutes.onboarding);
               },
-              child: const Text('Log Out'),
+              icon: const Icon(Icons.logout_rounded),
+              label: const Text('Log Out'),
             ),
           ),
-          const SizedBox(height: 8),
-          Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 16),
-            child: OutlinedButton(
-              onPressed: () async {
-                await controller.resetAll();
-                Get.offAllNamed(AppRoutes.onboarding);
-              },
-              child: const Text('Reset App Data'),
+          const SizedBox(height: 10),
+          Center(
+            child: TextButton(
+              onPressed: () => _confirmReset(context),
+              child: const Text(
+                'Reset App Data',
+                style: TextStyle(color: AppColors.textTertiary),
+              ),
             ),
           ),
         ],
+      ),
+    );
+  }
+
+  Widget _divider(BuildContext context) =>
+      Divider(height: 1, indent: 60, color: Theme.of(context).dividerColor);
+
+  void _editProfile(BuildContext context) {
+    final nameCtrl = TextEditingController(text: controller.userName.value);
+    final emailCtrl = TextEditingController(text: controller.userEmail.value);
+    showDialog<void>(
+      context: context,
+      builder: (dialogContext) => AlertDialog(
+        title: const Text('Edit Profile'),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            TextField(
+              controller: nameCtrl,
+              decoration: const InputDecoration(labelText: 'Name'),
+            ),
+            const SizedBox(height: 12),
+            TextField(
+              controller: emailCtrl,
+              keyboardType: TextInputType.emailAddress,
+              decoration: const InputDecoration(labelText: 'Email'),
+            ),
+          ],
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(dialogContext).pop(),
+            child: const Text('Cancel'),
+          ),
+          FilledButton(
+            onPressed: () {
+              controller.updateProfile(
+                name: nameCtrl.text.trim(),
+                email: emailCtrl.text.trim(),
+              );
+              Navigator.of(dialogContext).pop();
+            },
+            child: const Text('Save'),
+          ),
+        ],
+      ),
+    );
+  }
+
+  void _editPrices(BuildContext context) {
+    final fuelCtrl = TextEditingController(
+      text: controller.fuelPrice.value == 0
+          ? ''
+          : controller.fuelPrice.value.toString(),
+    );
+    final elecCtrl = TextEditingController(
+      text: controller.electricityPrice.value == 0
+          ? ''
+          : controller.electricityPrice.value.toString(),
+    );
+    showDialog<void>(
+      context: context,
+      builder: (dialogContext) => AlertDialog(
+        title: const Text('Energy Prices'),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            TextField(
+              controller: fuelCtrl,
+              keyboardType: const TextInputType.numberWithOptions(
+                decimal: true,
+              ),
+              decoration: InputDecoration(
+                labelText:
+                    'Fuel price / litre (${controller.currencySymbol.value})',
+              ),
+            ),
+            const SizedBox(height: 12),
+            TextField(
+              controller: elecCtrl,
+              keyboardType: const TextInputType.numberWithOptions(
+                decimal: true,
+              ),
+              decoration: InputDecoration(
+                labelText:
+                    'Electricity price / kWh (${controller.currencySymbol.value})',
+              ),
+            ),
+          ],
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(dialogContext).pop(),
+            child: const Text('Cancel'),
+          ),
+          FilledButton(
+            onPressed: () {
+              controller.setEnergyPrices(
+                fuel: double.tryParse(fuelCtrl.text.trim()) ?? 0,
+                electricity: double.tryParse(elecCtrl.text.trim()) ?? 0,
+              );
+              Navigator.of(dialogContext).pop();
+            },
+            child: const Text('Save'),
+          ),
+        ],
+      ),
+    );
+  }
+
+  void _importData(BuildContext context) {
+    final textCtrl = TextEditingController();
+    showDialog<void>(
+      context: context,
+      builder: (dialogContext) => AlertDialog(
+        title: const Text('Import Data'),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            const Text('Paste a JSON backup below to restore your data.'),
+            const SizedBox(height: 12),
+            TextField(
+              controller: textCtrl,
+              maxLines: 6,
+              decoration: const InputDecoration(
+                hintText: '{ "vehicles": ... }',
+              ),
+            ),
+          ],
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(dialogContext).pop(),
+            child: const Text('Cancel'),
+          ),
+          FilledButton(
+            onPressed: () {
+              final raw = textCtrl.text.trim();
+              Navigator.of(dialogContext).pop();
+              if (raw.isNotEmpty) controller.importFromText(raw);
+            },
+            child: const Text('Import'),
+          ),
+        ],
+      ),
+    );
+  }
+
+  void _privacyDialog(BuildContext context) {
+    showDialog<void>(
+      context: context,
+      builder: (dialogContext) => AlertDialog(
+        title: const Text('Privacy Policy'),
+        content: const Text(
+          'All data is stored locally on your device and is never uploaded or '
+          'shared with anyone. Exports only leave the device when you choose '
+          'to share them.',
+        ),
+        actions: [
+          FilledButton(
+            onPressed: () => Navigator.of(dialogContext).pop(),
+            child: const Text('Got it'),
+          ),
+        ],
+      ),
+    );
+  }
+
+  void _aboutDialog(BuildContext context) {
+    showAboutDialog(
+      context: context,
+      applicationName: controller.appName,
+      applicationVersion: 'Version ${controller.appVersion}',
+      applicationIcon: const Icon(
+        Icons.speed_rounded,
+        color: AppColors.primary,
+        size: 40,
+      ),
+      children: const [Text('Track real efficiency. See the real difference.')],
+    );
+  }
+
+  void _confirmReset(BuildContext context) {
+    showDialog<void>(
+      context: context,
+      builder: (dialogContext) => AlertDialog(
+        title: const Text('Reset all data?'),
+        content: const Text(
+          'This permanently deletes all vehicles, entries and settings.',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(dialogContext).pop(),
+            child: const Text('Cancel'),
+          ),
+          FilledButton(
+            style: FilledButton.styleFrom(backgroundColor: AppColors.negative),
+            onPressed: () async {
+              Navigator.of(dialogContext).pop();
+              await controller.resetAll();
+              Get.offAllNamed(AppRoutes.onboarding);
+            },
+            child: const Text('Reset'),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _GroupTitle extends StatelessWidget {
+  const _GroupTitle(this.title);
+  final String title;
+
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: const EdgeInsets.only(left: 4, bottom: 10),
+      child: Text(
+        title.toUpperCase(),
+        style: Theme.of(context).textTheme.bodySmall?.copyWith(
+          letterSpacing: 1,
+          fontWeight: FontWeight.w700,
+          color: AppColors.textTertiary,
+        ),
+      ),
+    );
+  }
+}
+
+class _Tile extends StatelessWidget {
+  const _Tile({
+    required this.icon,
+    required this.title,
+    required this.subtitle,
+    required this.onTap,
+  });
+  final IconData icon;
+  final String title;
+  final String subtitle;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    return ListTile(
+      onTap: onTap,
+      leading: Icon(icon, color: AppColors.primary),
+      title: Text(title, style: theme.textTheme.titleMedium),
+      subtitle: Text(subtitle, style: theme.textTheme.bodySmall),
+      trailing: const Icon(
+        Icons.chevron_right_rounded,
+        color: AppColors.textTertiary,
+      ),
+    );
+  }
+}
+
+class _SwitchTile extends StatelessWidget {
+  const _SwitchTile({
+    required this.icon,
+    required this.title,
+    required this.value,
+    required this.onChanged,
+  });
+  final IconData icon;
+  final String title;
+  final bool value;
+  final ValueChanged<bool> onChanged;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    return SwitchListTile.adaptive(
+      secondary: Icon(icon, color: AppColors.primary),
+      title: Text(title, style: theme.textTheme.titleMedium),
+      value: value,
+      activeThumbColor: AppColors.primary,
+      onChanged: onChanged,
+    );
+  }
+}
+
+class _DropdownTile extends StatelessWidget {
+  const _DropdownTile({
+    required this.icon,
+    required this.title,
+    required this.value,
+    required this.options,
+    required this.onChanged,
+  });
+  final IconData icon;
+  final String title;
+  final String value;
+  final List<String> options;
+  final ValueChanged<String> onChanged;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    return ListTile(
+      leading: Icon(icon, color: AppColors.primary),
+      title: Text(title, style: theme.textTheme.titleMedium),
+      trailing: DropdownButtonHideUnderline(
+        child: DropdownButton<String>(
+          value: options.contains(value) ? value : options.first,
+          borderRadius: BorderRadius.circular(14),
+          items: options
+              .map((o) => DropdownMenuItem(value: o, child: Text(o)))
+              .toList(),
+          onChanged: (v) {
+            if (v != null) onChanged(v);
+          },
+        ),
       ),
     );
   }

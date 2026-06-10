@@ -10,9 +10,12 @@ class FuelEntryModel {
     required this.distance,
     this.liters = 0,
     this.kwh = 0,
-    required this.fuelCost,
+    this.fuelCost = 0,
     this.electricityCost = 0,
     required this.odometer,
+    this.fuelGrade,
+    this.fullTank = true,
+    this.note,
   });
 
   static const storageKey = 'fuel_entries';
@@ -26,7 +29,12 @@ class FuelEntryModel {
   final double kwh;
   final double fuelCost;
   final double electricityCost;
+
+  /// End odometer reading recorded with this entry.
   final double odometer;
+  final String? fuelGrade;
+  final bool fullTank;
+  final String? note;
 
   double get totalCost => fuelCost + electricityCost;
 
@@ -35,6 +43,9 @@ class FuelEntryModel {
   double get costPerLiter => liters > 0 ? fuelCost / liters : 0;
 
   double get costPerKwh => kwh > 0 ? electricityCost / kwh : 0;
+
+  /// Odometer reading at the start of this leg.
+  double get startOdometer => odometer - distance;
 
   FuelEntryModel copyWith({
     String? id,
@@ -47,6 +58,11 @@ class FuelEntryModel {
     double? fuelCost,
     double? electricityCost,
     double? odometer,
+    String? fuelGrade,
+    bool clearFuelGrade = false,
+    bool? fullTank,
+    String? note,
+    bool clearNote = false,
   }) {
     return FuelEntryModel(
       id: id ?? this.id,
@@ -59,21 +75,27 @@ class FuelEntryModel {
       fuelCost: fuelCost ?? this.fuelCost,
       electricityCost: electricityCost ?? this.electricityCost,
       odometer: odometer ?? this.odometer,
+      fuelGrade: clearFuelGrade ? null : fuelGrade ?? this.fuelGrade,
+      fullTank: fullTank ?? this.fullTank,
+      note: clearNote ? null : note ?? this.note,
     );
   }
 
   Map<String, dynamic> toJson() => {
-        'id': id,
-        'vehicleId': vehicleId,
-        'date': date.toIso8601String(),
-        'mode': mode.storageValue,
-        'distance': distance,
-        'liters': liters,
-        'kwh': kwh,
-        'fuelCost': fuelCost,
-        'electricityCost': electricityCost,
-        'odometer': odometer,
-      };
+    'id': id,
+    'vehicleId': vehicleId,
+    'date': date.toIso8601String(),
+    'mode': mode.storageValue,
+    'distance': distance,
+    'liters': liters,
+    'kwh': kwh,
+    'fuelCost': fuelCost,
+    'electricityCost': electricityCost,
+    'odometer': odometer,
+    'fuelGrade': fuelGrade,
+    'fullTank': fullTank,
+    'note': note,
+  };
 
   factory FuelEntryModel.fromJson(Map<String, dynamic> json) {
     return FuelEntryModel(
@@ -84,11 +106,15 @@ class FuelEntryModel {
       distance: (json['distance'] as num?)?.toDouble() ?? 0,
       liters: (json['liters'] as num?)?.toDouble() ?? 0,
       kwh: (json['kwh'] as num?)?.toDouble() ?? 0,
-      fuelCost: (json['fuelCost'] as num?)?.toDouble() ??
+      fuelCost:
+          (json['fuelCost'] as num?)?.toDouble() ??
           (json['cost'] as num?)?.toDouble() ??
           0,
       electricityCost: (json['electricityCost'] as num?)?.toDouble() ?? 0,
       odometer: (json['odometer'] as num).toDouble(),
+      fuelGrade: json['fuelGrade'] as String?,
+      fullTank: json['fullTank'] as bool? ?? true,
+      note: json['note'] as String?,
     );
   }
 

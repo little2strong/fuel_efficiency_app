@@ -1,228 +1,274 @@
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
-import 'package:fuel_efficiency_app/core/values/app_colors.dart';
-import 'package:fuel_efficiency_app/features/home/home_controller.dart';
-import 'package:fuel_efficiency_app/features/fuel/fuel_entry_model.dart';
-import 'package:fuel_efficiency_app/features/vehicle/vehicle_model.dart';
 
-class HomeView extends GetView<HomeController> {
-  const HomeView({super.key});
+import 'package:fuel_efficiency_app/core/utils/formatters.dart';
+import 'package:fuel_efficiency_app/core/values/app_colors.dart';
+import 'package:fuel_efficiency_app/core/widgets/app_card.dart';
+import 'package:fuel_efficiency_app/core/widgets/delta_badge.dart';
+import 'package:fuel_efficiency_app/core/widgets/empty_state.dart';
+import 'package:fuel_efficiency_app/core/widgets/loading_view.dart';
+import 'package:fuel_efficiency_app/core/widgets/section_header.dart';
+import 'package:fuel_efficiency_app/core/widgets/stat_card.dart';
+import 'package:fuel_efficiency_app/core/widgets/trend_line_chart.dart';
+import 'package:fuel_efficiency_app/features/home/home_controller.dart';
+import 'package:fuel_efficiency_app/features/main/main_controller.dart';
+import 'package:fuel_efficiency_app/features/shared/widgets/entry_tile.dart';
+import 'package:fuel_efficiency_app/features/shared/widgets/vehicle_selector.dart';
+
+class DashboardTab extends GetView<HomeController> {
+  const DashboardTab({super.key});
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      body: Obx(() {
+    final theme = Theme.of(context);
+    return SafeArea(
+      bottom: false,
+      child: Obx(() {
         if (!controller.isHydrated.value) {
-          return const Center(child: CircularProgressIndicator());
+          return const LoadingView();
+        }
+        if (controller.vehicles.isEmpty) {
+          return EmptyState(
+            icon: Icons.directions_car_filled_rounded,
+            title: 'No vehicle yet',
+            message: 'Add a vehicle to start tracking real efficiency.',
+            actionLabel: 'Add vehicle',
+            onAction: controller.goToVehicleProfile,
+          );
         }
 
+        final unit = controller.distanceUnit.value;
+        final currency = controller.currencySymbol.value;
+
         return RefreshIndicator(
+          color: AppColors.primary,
           onRefresh: () async => controller.refreshData(),
           child: ListView(
-            padding: const EdgeInsets.all(16),
+            padding: const EdgeInsets.fromLTRB(16, 8, 16, 24),
             children: [
-              _Header(controller: controller),
-              const SizedBox(height: 16),
-              _VehicleSelector(controller: controller),
-              const SizedBox(height: 16),
-              _PrimaryMetrics(controller: controller),
-              const SizedBox(height: 14),
-              _MiniStats(controller: controller),
-              const SizedBox(height: 24),
-              Text(
-                'Efficiency Trend (last 6)',
-                style: Theme.of(context).textTheme.titleLarge,
-              ),
-              const SizedBox(height: 12),
-              _TrendCard(controller: controller),
-              const SizedBox(height: 24),
-              Text(
-                'Recent Entries',
-                style: Theme.of(context).textTheme.titleLarge,
-              ),
-              const SizedBox(height: 12),
-              if (controller.recentEntries.isEmpty)
-                const Card(
-                  child: Padding(
-                    padding: EdgeInsets.all(16),
-                    child: Text('No fuel entries yet. Add your first entry.'),
+              Row(
+                children: [
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text('Dashboard', style: theme.textTheme.headlineSmall),
+                        Text(
+                          'Hi ${controller.userName}',
+                          style: theme.textTheme.bodySmall,
+                        ),
+                      ],
+                    ),
                   ),
+                  VehicleSelector(
+                    vehicles: controller.vehicles.toList(),
+                    selectedId: controller.selectedVehicleId.value,
+                    onSelected: controller.selectVehicle,
+                  ),
+                ],
+              ),
+              const SizedBox(height: 18),
+              _HeadlineCard(controller: controller),
+              const SizedBox(height: 12),
+              Row(
+                children: [
+                  Expanded(
+                    child: StatCard(
+                      label: 'Cost / ${unit.toLowerCase()}',
+                      value: Formatters.currency(
+                        controller.monthlyCostPerDistance,
+                        currency,
+                      ),
+                      icon: Icons.paid_rounded,
+                    ),
+                  ),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: StatCard(
+                      label: 'Month Miles',
+                      value: Formatters.integer(controller.monthlyDistance),
+                      icon: Icons.calendar_month_rounded,
+                    ),
+                  ),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: StatCard(
+                      label: 'Month Cost',
+                      value: Formatters.currency(
+                        controller.monthlyCost,
+                        currency,
+                      ),
+                      icon: Icons.payments_rounded,
+                    ),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 22),
+              _TrendCard(controller: controller),
+              const SizedBox(height: 22),
+              SectionHeader(
+                title: 'Recent Entries',
+                trailing: TextButton(
+                  onPressed: () => Get.find<MainController>().changeTab(1),
+                  child: const Text('View all'),
+                ),
+              ),
+              if (controller.recentEntries.isEmpty)
+                const EmptyState(
+                  compact: true,
+                  icon: Icons.local_gas_station_rounded,
+                  title: 'No entries yet',
+                  message:
+                      'Tap the + button to log your first fill-up or charge.',
                 )
               else
                 ...controller.recentEntries.map(
-                  (entry) => _EntryTile(
+                  (entry) => EntryTile(
                     entry: entry,
-                    currency: controller.currencySymbol.value,
-                    distanceUnit: controller.distanceUnit.value,
+                    currencySymbol: currency,
+                    distanceUnit: unit,
+                    volumeUnit: controller.volumeUnit.value,
+                    onTap: () => controller.openEntry(entry),
                   ),
                 ),
             ],
           ),
         );
       }),
-      bottomNavigationBar: SafeArea(
-        top: false,
-        child: Padding(
-          padding: const EdgeInsets.fromLTRB(12, 0, 12, 12),
-          child: Row(
+    );
+  }
+}
+
+class _HeadlineCard extends StatelessWidget {
+  const _HeadlineCard({required this.controller});
+  final HomeController controller;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final isElectric = controller.isElectric;
+    final isHybrid = controller.isHybrid;
+    final realValue = isElectric
+        ? Formatters.twoDecimal(controller.primaryEfficiency)
+        : isHybrid
+        ? Formatters.currency(
+            controller.primaryEfficiency,
+            controller.currencySymbol.value,
+          )
+        : Formatters.oneDecimal(controller.primaryEfficiency);
+    final claimed = controller.claimedPrimary;
+
+    return AppCard(
+      padding: const EdgeInsets.all(18),
+      gradient: const LinearGradient(
+        begin: Alignment.topLeft,
+        end: Alignment.bottomRight,
+        colors: [AppColors.primary, AppColors.primaryDark],
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
             children: [
-              Expanded(
-                child: FilledButton.icon(
-                  onPressed: controller.goToFuel,
-                  icon: const Icon(Icons.add),
-                  label: const Text('Add Entry'),
+              Text(
+                controller.headlineLabel,
+                style: theme.textTheme.bodyMedium?.copyWith(
+                  color: Colors.white.withValues(alpha: 0.85),
                 ),
               ),
-              const SizedBox(width: 8),
-              Expanded(
-                child: OutlinedButton.icon(
-                  onPressed: controller.goToVehicle,
-                  icon: const Icon(Icons.directions_car),
-                  label: const Text('Vehicle'),
-                ),
-              ),
-              const SizedBox(width: 8),
-              IconButton.filledTonal(
-                onPressed: controller.goToSettings,
-                icon: const Icon(Icons.settings),
-              ),
+              const Spacer(),
+              if (claimed != null && !isHybrid)
+                DeltaBadge(value: controller.differencePercent),
             ],
           ),
-        ),
-      ),
-    );
-  }
-}
-
-class _Header extends StatelessWidget {
-  const _Header({required this.controller});
-  final HomeController controller;
-
-  @override
-  Widget build(BuildContext context) {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Text(
-          'Dashboard',
-          style: Theme.of(context).textTheme.headlineSmall?.copyWith(
-                fontWeight: FontWeight.w700,
+          const SizedBox(height: 8),
+          Row(
+            crossAxisAlignment: CrossAxisAlignment.baseline,
+            textBaseline: TextBaseline.alphabetic,
+            children: [
+              Text(
+                realValue,
+                style: theme.textTheme.displaySmall?.copyWith(
+                  color: Colors.white,
+                  fontSize: isHybrid ? 36 : 44,
+                ),
               ),
-        ),
-        const SizedBox(height: 4),
-        Text(
-          'Hi ${controller.userName}, let\'s track real efficiency.',
-          style: const TextStyle(color: AppColors.textSecondary),
-        ),
-      ],
-    );
-  }
-}
-
-class _VehicleSelector extends StatelessWidget {
-  const _VehicleSelector({required this.controller});
-  final HomeController controller;
-
-  @override
-  Widget build(BuildContext context) {
-    final vehicles =
-        controller.vehicles.cast<VehicleModel>().toList(growable: false);
-    if (vehicles.isEmpty) {
-      return const Card(
-        child: Padding(
-          padding: EdgeInsets.all(14),
-          child: Text('No vehicle found. Add a vehicle to continue.'),
-        ),
-      );
-    }
-    return DropdownButtonFormField<String>(
-      initialValue: controller.selectedVehicleId.value.isEmpty
-          ? vehicles.first.id
-          : controller.selectedVehicleId.value,
-      decoration: const InputDecoration(labelText: 'Selected vehicle'),
-      items: vehicles
-          .map(
-            (vehicle) => DropdownMenuItem<String>(
-              value: vehicle.id,
-              child: Text('${vehicle.name} • ${vehicle.makeModel}'),
-            ),
-          )
-          .toList(),
-      onChanged: (value) {
-        if (value != null) {
-          controller.selectVehicle(value);
-        }
-      },
-    );
-  }
-}
-
-class _PrimaryMetrics extends StatelessWidget {
-  const _PrimaryMetrics({required this.controller});
-  final HomeController controller;
-
-  @override
-  Widget build(BuildContext context) {
-    return Card(
-      child: Padding(
-        padding: const EdgeInsets.all(14),
-        child: Row(
-          children: [
-            Expanded(
-              child: _MetricBlock(
-                title: 'Real MPG',
-                value: controller.realMpg.toStringAsFixed(1),
-                icon: Icons.show_chart,
-              ),
-            ),
-            Expanded(
-              child: _MetricBlock(
-                title: 'Claimed MPG',
-                value: controller.claimedMpg <= 0
-                    ? '--'
-                    : controller.claimedMpg.toStringAsFixed(1),
-                icon: Icons.verified_outlined,
+              if (!isHybrid) ...[
+                const SizedBox(width: 8),
+                Padding(
+                  padding: const EdgeInsets.only(bottom: 6),
+                  child: Text(
+                    controller.primaryUnit,
+                    style: theme.textTheme.titleMedium?.copyWith(
+                      color: Colors.white.withValues(alpha: 0.85),
+                    ),
+                  ),
+                ),
+              ],
+            ],
+          ),
+          if (isHybrid) ...[
+            const SizedBox(height: 8),
+            Text(
+              '${Formatters.oneDecimal(controller.realMpg)} MPG fuel • '
+              '${Formatters.twoDecimal(controller.realMilesPerKwh)} mi/kWh electric',
+              style: theme.textTheme.bodyMedium?.copyWith(
+                color: Colors.white.withValues(alpha: 0.9),
               ),
             ),
           ],
-        ),
+          const SizedBox(height: 10),
+          Container(
+            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+            decoration: BoxDecoration(
+              color: Colors.white.withValues(alpha: 0.15),
+              borderRadius: BorderRadius.circular(12),
+            ),
+            child: Row(
+              children: [
+                Icon(
+                  Icons.verified_rounded,
+                  size: 16,
+                  color: Colors.white.withValues(alpha: 0.9),
+                ),
+                const SizedBox(width: 8),
+                Expanded(
+                  child: Text(
+                    _claimText(controller, claimed),
+                    style: theme.textTheme.bodyMedium?.copyWith(
+                      color: Colors.white.withValues(alpha: 0.95),
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ],
       ),
     );
   }
-}
 
-class _MiniStats extends StatelessWidget {
-  const _MiniStats({required this.controller});
-  final HomeController controller;
-
-  @override
-  Widget build(BuildContext context) {
-    final currency = controller.currencySymbol.value;
-    final unit = controller.distanceUnit.value.toLowerCase();
-    return Row(
-      children: [
-        Expanded(
-          child: _StatChip(
-            title: 'Monthly Cost',
-            value: '$currency${controller.monthlyFuelCost.toStringAsFixed(0)}',
-          ),
-        ),
-        const SizedBox(width: 8),
-        Expanded(
-          child: _StatChip(
-            title: 'Cost per $unit',
-            value: '$currency${controller.avgCostPerDistance.toStringAsFixed(2)}',
-          ),
-        ),
-        const SizedBox(width: 8),
-        Expanded(
-          child: _StatChip(
-            title: 'Reality',
-            value: '${controller.realityPercent.toStringAsFixed(1)}%',
-          ),
-        ),
-      ],
-    );
+  String _claimText(HomeController controller, double? claimed) {
+    if (controller.isElectric && claimed != null) {
+      return 'Claimed: ${Formatters.twoDecimal(claimed)} mi/kWh';
+    }
+    if (controller.isHybrid) {
+      final parts = <String>[];
+      if (controller.claimedMpg > 0) {
+        parts.add('${Formatters.oneDecimal(controller.claimedMpg)} MPG fuel');
+      }
+      if (controller.claimedMiPerKwh > 0) {
+        parts.add(
+          '${Formatters.twoDecimal(controller.claimedMiPerKwh)} mi/kWh',
+        );
+      }
+      if (parts.isEmpty) return 'Add manufacturer claims to compare';
+      return 'Claimed: ${parts.join(' • ')}';
+    }
+    if (claimed != null) {
+      return 'Claimed: ${Formatters.oneDecimal(claimed)} MPG';
+    }
+    return 'Add a manufacturer claim to compare';
   }
 }
 
@@ -232,139 +278,27 @@ class _TrendCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final trend = controller.recentEntries.cast<FuelEntryModel>().toList();
-    final values = trend.take(6).map((e) => e.costPerDistance).toList().reversed.toList();
-    final max = values.isEmpty ? 1.0 : values.reduce((a, b) => a > b ? a : b);
-    return Card(
-      child: Padding(
-        padding: const EdgeInsets.all(14),
-        child: SizedBox(
-          height: 80,
-          child: values.isEmpty
-              ? const Center(child: Text('Not enough data'))
-              : Row(
-                  crossAxisAlignment: CrossAxisAlignment.end,
-                  children: values
-                      .map(
-                        (value) => Expanded(
-                          child: Padding(
-                            padding: const EdgeInsets.symmetric(horizontal: 3),
-                            child: Container(
-                              height: (value / max) * 70,
-                              decoration: BoxDecoration(
-                                color: AppColors.primary.withValues(alpha: 0.8),
-                                borderRadius: BorderRadius.circular(6),
-                              ),
-                            ),
-                          ),
-                        ),
-                      )
-                      .toList(),
+    final theme = Theme.of(context);
+    final points = controller.trendPoints;
+    return AppCard(
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Expanded(
+                child: Text(
+                  controller.trendTitle,
+                  style: theme.textTheme.titleMedium,
                 ),
-        ),
-      ),
-    );
-  }
-}
-
-class _MetricBlock extends StatelessWidget {
-  const _MetricBlock({
-    required this.title,
-    required this.value,
-    required this.icon,
-  });
-
-  final String title;
-  final String value;
-  final IconData icon;
-
-  @override
-  Widget build(BuildContext context) {
-    return Column(
-      children: [
-        Icon(icon, color: AppColors.primary),
-        const SizedBox(height: 8),
-        Text(title, style: const TextStyle(color: AppColors.textSecondary)),
-        const SizedBox(height: 2),
-        Text(
-          value,
-          style: Theme.of(context).textTheme.titleLarge?.copyWith(
-                fontWeight: FontWeight.w700,
               ),
-        ),
-      ],
-    );
-  }
-}
-
-class _StatChip extends StatelessWidget {
-  const _StatChip({required this.title, required this.value});
-
-  final String title;
-  final String value;
-
-  @override
-  Widget build(BuildContext context) {
-    return Card(
-      child: Padding(
-        padding: const EdgeInsets.symmetric(vertical: 10, horizontal: 8),
-        child: Column(
-          children: [
-            Text(
-              value,
-              style: const TextStyle(
-                fontWeight: FontWeight.w700,
-                color: AppColors.textPrimary,
-              ),
-            ),
-            const SizedBox(height: 3),
-            Text(
-              title,
-              textAlign: TextAlign.center,
-              style: const TextStyle(
-                fontSize: 11,
-                color: AppColors.textSecondary,
-              ),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-}
-
-class _EntryTile extends StatelessWidget {
-  const _EntryTile({
-    required this.entry,
-    required this.currency,
-    required this.distanceUnit,
-  });
-
-  final FuelEntryModel entry;
-  final String currency;
-  final String distanceUnit;
-
-  @override
-  Widget build(BuildContext context) {
-    return Card(
-      child: ListTile(
-        leading: Icon(
-          entry.mode.name == 'charge'
-              ? Icons.bolt
-              : entry.mode.name == 'hybrid'
-                  ? Icons.auto_awesome_motion_rounded
-                  : Icons.local_gas_station,
-        ),
-        title: Text(
-          '${entry.distance.toStringAsFixed(0)} $distanceUnit • $currency${entry.totalCost.toStringAsFixed(2)}',
-        ),
-        subtitle: Text(
-          '${entry.date.day}/${entry.date.month}/${entry.date.year}  |  Odo ${entry.odometer.toStringAsFixed(0)}',
-        ),
-        trailing: Text(
-          '$currency${entry.costPerDistance.toStringAsFixed(2)}',
-          style: const TextStyle(fontWeight: FontWeight.w700),
-        ),
+              if (points.length >= 2)
+                DeltaBadge(value: controller.trendChangePercent),
+            ],
+          ),
+          const SizedBox(height: 16),
+          TrendLineChart(points: points, height: 180),
+        ],
       ),
     );
   }

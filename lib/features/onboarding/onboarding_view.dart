@@ -1,9 +1,10 @@
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
-import 'package:fuel_efficiency_app/core/constants/app_constants.dart';
+
 import 'package:fuel_efficiency_app/core/values/app_colors.dart';
+import 'package:fuel_efficiency_app/core/widgets/app_text_field.dart';
+import 'package:fuel_efficiency_app/core/widgets/energy_mode_selector.dart';
 import 'package:fuel_efficiency_app/features/onboarding/onboarding_controller.dart';
-import 'package:fuel_efficiency_app/features/shared/app_enums.dart';
 
 class OnboardingView extends GetView<OnboardingController> {
   const OnboardingView({super.key});
@@ -13,70 +14,65 @@ class OnboardingView extends GetView<OnboardingController> {
     return Scaffold(
       body: SafeArea(
         child: Obx(() {
-          switch (controller.step.value) {
-            case 0:
-              return _SplashIntroStep(onNext: controller.nextStep);
-            case 1:
-              return _WelcomeStep(onContinue: controller.moveToSignIn);
-            case 2:
-              return _SignInStep(
-                controller: controller,
-                onContinue: controller.moveToVehicleMode,
-              );
-            case 3:
-              return _VehicleModeStep(
-                controller: controller,
-                onContinue: controller.nextStep,
-              );
-            default:
-              return _VehicleDetailsStep(
-                controller: controller,
-                onBack: controller.backStep,
-                onSubmit: controller.saveAndContinue,
-              );
-          }
+          final step = controller.step.value;
+          return Column(
+            children: [
+              _TopBar(step: step, onBack: controller.back),
+              Expanded(
+                child: AnimatedSwitcher(
+                  duration: const Duration(milliseconds: 250),
+                  child: KeyedSubtree(
+                    key: ValueKey(step),
+                    child: switch (step) {
+                      0 => const _WelcomeStep(),
+                      1 => const _LoginStep(),
+                      2 => const _VehicleModeStep(),
+                      _ => const _VehicleDetailsStep(),
+                    },
+                  ),
+                ),
+              ),
+            ],
+          );
         }),
       ),
     );
   }
 }
 
-class _SplashIntroStep extends StatelessWidget {
-  const _SplashIntroStep({required this.onNext});
-
-  final VoidCallback onNext;
+class _TopBar extends StatelessWidget {
+  const _TopBar({required this.step, required this.onBack});
+  final int step;
+  final VoidCallback onBack;
 
   @override
   Widget build(BuildContext context) {
     return Padding(
-      padding: const EdgeInsets.all(24),
-      child: Column(
-        mainAxisAlignment: MainAxisAlignment.center,
+      padding: const EdgeInsets.fromLTRB(8, 8, 16, 0),
+      child: Row(
         children: [
-          const Icon(
-            Icons.speed_rounded,
-            size: 92,
-            color: AppColors.primary,
+          AnimatedOpacity(
+            opacity: step == 0 ? 0 : 1,
+            duration: const Duration(milliseconds: 200),
+            child: IconButton(
+              onPressed: step == 0 ? null : onBack,
+              icon: const Icon(Icons.arrow_back_rounded),
+            ),
           ),
-          const SizedBox(height: 20),
-          Text(
-            AppConstants.appName,
-            textAlign: TextAlign.center,
-            style: Theme.of(context).textTheme.headlineSmall?.copyWith(
-                  fontWeight: FontWeight.w700,
+          const Spacer(),
+          Row(
+            children: List.generate(
+              OnboardingController.lastStep + 1,
+              (index) => AnimatedContainer(
+                duration: const Duration(milliseconds: 220),
+                margin: const EdgeInsets.symmetric(horizontal: 3),
+                height: 7,
+                width: index == step ? 22 : 7,
+                decoration: BoxDecoration(
+                  color: index == step ? AppColors.primary : AppColors.divider,
+                  borderRadius: BorderRadius.circular(4),
                 ),
-          ),
-          const SizedBox(height: 10),
-          const Text(
-            'Track real efficiency. Save more. Drive smarter.',
-            textAlign: TextAlign.center,
-          ),
-          const SizedBox(height: 34),
-          SizedBox(
-            width: double.infinity,
-            child: FilledButton(
-              onPressed: onNext,
-              child: const Text('Continue'),
+              ),
             ),
           ),
         ],
@@ -86,37 +82,62 @@ class _SplashIntroStep extends StatelessWidget {
 }
 
 class _WelcomeStep extends StatelessWidget {
-  const _WelcomeStep({required this.onContinue});
-
-  final VoidCallback onContinue;
+  const _WelcomeStep();
 
   @override
   Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final controller = Get.find<OnboardingController>();
     return Padding(
       padding: const EdgeInsets.all(24),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          const Spacer(),
-          Text(
-            'Welcome!',
-            style: Theme.of(context).textTheme.headlineMedium?.copyWith(
-                  fontWeight: FontWeight.w700,
-                ),
+          const SizedBox(height: 12),
+          Container(
+            height: 64,
+            width: 64,
+            decoration: BoxDecoration(
+              color: AppColors.primarySurface,
+              borderRadius: BorderRadius.circular(18),
+            ),
+            child: const Icon(
+              Icons.speed_rounded,
+              color: AppColors.primary,
+              size: 34,
+            ),
           ),
+          const SizedBox(height: 22),
+          Text('Welcome!', style: theme.textTheme.headlineMedium),
           const SizedBox(height: 8),
-          const Text(
-            'Discover your vehicle\'s true efficiency by comparing what your vehicle claims vs what you actually achieve.',
+          Text(
+            'Track real efficiency vs dashboard estimates. Log fuel and '
+            'charging stops, see your true MPG or mi/kWh, and save money.',
+            style: theme.textTheme.bodyLarge?.copyWith(
+              color: AppColors.textSecondary,
+            ),
           ),
-          const SizedBox(height: 20),
-          const _BulletText('Track fuel or charge logs'),
-          const _BulletText('See real efficiency trends'),
-          const _BulletText('Compare and save money'),
+          const SizedBox(height: 28),
+          const _FeatureRow(
+            icon: Icons.local_gas_station_rounded,
+            title: 'Track Fuel or Charging',
+            subtitle: 'Log fuel, charge and hybrid entries.',
+          ),
+          const _FeatureRow(
+            icon: Icons.insights_rounded,
+            title: 'See Real Efficiency',
+            subtitle: 'Get real MPG or mi/kWh, not marketing numbers.',
+          ),
+          const _FeatureRow(
+            icon: Icons.savings_rounded,
+            title: 'Compare & Save More',
+            subtitle: 'Improve efficiency and save money.',
+          ),
           const Spacer(),
           SizedBox(
             width: double.infinity,
             child: FilledButton(
-              onPressed: onContinue,
+              onPressed: controller.next,
               child: const Text('Get Started'),
             ),
           ),
@@ -126,60 +147,40 @@ class _WelcomeStep extends StatelessWidget {
   }
 }
 
-class _SignInStep extends StatelessWidget {
-  const _SignInStep({
-    required this.controller,
-    required this.onContinue,
+class _FeatureRow extends StatelessWidget {
+  const _FeatureRow({
+    required this.icon,
+    required this.title,
+    required this.subtitle,
   });
-
-  final OnboardingController controller;
-  final VoidCallback onContinue;
+  final IconData icon;
+  final String title;
+  final String subtitle;
 
   @override
   Widget build(BuildContext context) {
+    final theme = Theme.of(context);
     return Padding(
-      padding: const EdgeInsets.all(24),
-      child: Column(
+      padding: const EdgeInsets.only(bottom: 18),
+      child: Row(
         children: [
-          const SizedBox(height: 20),
-          Text(
-            'Welcome Back',
-            style: Theme.of(context).textTheme.headlineSmall?.copyWith(
-                  fontWeight: FontWeight.w700,
-                ),
+          Container(
+            height: 44,
+            width: 44,
+            decoration: BoxDecoration(
+              color: AppColors.primarySurface,
+              borderRadius: BorderRadius.circular(12),
+            ),
+            child: Icon(icon, color: AppColors.primary, size: 22),
           ),
-          const Text('Log in quickly to continue'),
-          const SizedBox(height: 24),
-          OutlinedButton.icon(
-            onPressed: onContinue,
-            icon: const Icon(Icons.g_mobiledata_rounded),
-            label: const Text('Continue with Google'),
-          ),
-          const SizedBox(height: 10),
-          OutlinedButton.icon(
-            onPressed: onContinue,
-            icon: const Icon(Icons.apple),
-            label: const Text('Continue with Apple'),
-          ),
-          const SizedBox(height: 14),
-          const Text('or'),
-          const SizedBox(height: 14),
-          TextField(
-            controller: controller.nameController,
-            decoration: const InputDecoration(labelText: 'Name'),
-          ),
-          const SizedBox(height: 12),
-          TextField(
-            controller: controller.emailController,
-            keyboardType: TextInputType.emailAddress,
-            decoration: const InputDecoration(labelText: 'Email'),
-          ),
-          const Spacer(),
-          SizedBox(
-            width: double.infinity,
-            child: FilledButton(
-              onPressed: onContinue,
-              child: const Text('Continue'),
+          const SizedBox(width: 14),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(title, style: theme.textTheme.titleMedium),
+                Text(subtitle, style: theme.textTheme.bodySmall),
+              ],
             ),
           ),
         ],
@@ -188,50 +189,190 @@ class _SignInStep extends StatelessWidget {
   }
 }
 
-class _VehicleModeStep extends StatelessWidget {
-  const _VehicleModeStep({
-    required this.controller,
-    required this.onContinue,
-  });
-
-  final OnboardingController controller;
-  final VoidCallback onContinue;
+class _LoginStep extends StatelessWidget {
+  const _LoginStep();
 
   @override
   Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final controller = Get.find<OnboardingController>();
+    return SingleChildScrollView(
+      padding: const EdgeInsets.all(24),
+      child: Obx(() {
+        final signUp = controller.isSignUp.value;
+        return Form(
+          key: controller.loginFormKey,
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              const SizedBox(height: 8),
+              Text(
+                signUp ? 'Create Account' : 'Welcome Back',
+                style: theme.textTheme.headlineMedium,
+              ),
+              const SizedBox(height: 6),
+              Text(
+                signUp
+                    ? 'Sign up to start tracking your real efficiency'
+                    : 'Log in to continue',
+                style: theme.textTheme.bodyMedium?.copyWith(
+                  color: AppColors.textSecondary,
+                ),
+              ),
+              const SizedBox(height: 24),
+              OutlinedButton.icon(
+                onPressed: () => controller.socialSignIn('google'),
+                icon: const Icon(Icons.g_mobiledata_rounded, size: 28),
+                label: const Text('Continue with Google'),
+              ),
+              const SizedBox(height: 12),
+              OutlinedButton.icon(
+                onPressed: () => controller.socialSignIn('apple'),
+                icon: const Icon(Icons.apple, size: 22),
+                label: const Text('Continue with Apple'),
+              ),
+              const SizedBox(height: 20),
+              Row(
+                children: [
+                  const Expanded(child: Divider()),
+                  Padding(
+                    padding: const EdgeInsets.symmetric(horizontal: 12),
+                    child: Text('or', style: theme.textTheme.bodySmall),
+                  ),
+                  const Expanded(child: Divider()),
+                ],
+              ),
+              const SizedBox(height: 20),
+              if (signUp) ...[
+                AppTextField(
+                  controller: controller.nameController,
+                  label: 'Full Name',
+                  hint: 'Your name',
+                  validator: controller.validateName,
+                ),
+                const SizedBox(height: 16),
+              ],
+              AppTextField(
+                controller: controller.emailController,
+                label: 'Email',
+                hint: 'you@example.com',
+                keyboardType: TextInputType.emailAddress,
+                validator: controller.validateEmail,
+              ),
+              const SizedBox(height: 16),
+              Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    'Password',
+                    style: theme.textTheme.bodyMedium?.copyWith(
+                      fontWeight: FontWeight.w600,
+                    ),
+                  ),
+                  const SizedBox(height: 8),
+                  TextFormField(
+                    controller: controller.passwordController,
+                    obscureText: controller.obscurePassword.value,
+                    validator: controller.validatePassword,
+                    autovalidateMode: AutovalidateMode.onUserInteraction,
+                    decoration: InputDecoration(
+                      hintText: '••••••',
+                      suffixIcon: IconButton(
+                        onPressed: controller.togglePassword,
+                        icon: Icon(
+                          controller.obscurePassword.value
+                              ? Icons.visibility_off_rounded
+                              : Icons.visibility_rounded,
+                        ),
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+              if (!signUp) ...[
+                const SizedBox(height: 8),
+                Align(
+                  alignment: Alignment.centerRight,
+                  child: TextButton(
+                    onPressed: () => Get.snackbar(
+                      'Password reset',
+                      'Password reset is not available in this demo build.',
+                      snackPosition: SnackPosition.BOTTOM,
+                    ),
+                    child: const Text('Forgot Password?'),
+                  ),
+                ),
+              ],
+              const SizedBox(height: 12),
+              FilledButton(
+                onPressed: controller.submitAuth,
+                child: Text(signUp ? 'Sign Up' : 'Log In'),
+              ),
+              const SizedBox(height: 12),
+              Center(
+                child: TextButton(
+                  onPressed: controller.toggleAuthMode,
+                  child: Text.rich(
+                    TextSpan(
+                      text: signUp
+                          ? 'Already have an account? '
+                          : "Don't have an account? ",
+                      style: theme.textTheme.bodySmall,
+                      children: [
+                        TextSpan(
+                          text: signUp ? 'Log in' : 'Sign up',
+                          style: const TextStyle(
+                            color: AppColors.primary,
+                            fontWeight: FontWeight.w700,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+              ),
+            ],
+          ),
+        );
+      }),
+    );
+  }
+}
+
+class _VehicleModeStep extends StatelessWidget {
+  const _VehicleModeStep();
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final controller = Get.find<OnboardingController>();
     return Padding(
       padding: const EdgeInsets.all(24),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          const SizedBox(height: 20),
-          Text(
-            'What type of vehicle do you use?',
-            style: Theme.of(context).textTheme.titleLarge?.copyWith(
-                  fontWeight: FontWeight.w700,
-                ),
-          ),
           const SizedBox(height: 8),
-          const Text('Select your energy mode'),
-          const SizedBox(height: 18),
+          Text('Select your energy mode', style: theme.textTheme.headlineSmall),
+          const SizedBox(height: 8),
+          Text(
+            'This determines which fields and calculations you\'ll see when '
+            'logging stops.',
+            style: theme.textTheme.bodyMedium?.copyWith(
+              color: AppColors.textSecondary,
+            ),
+          ),
+          const SizedBox(height: 24),
           Obx(
-            () => Column(
-              children: EnergyMode.values
-                  .map(
-                    (mode) => _EnergyModeTile(
-                      mode: mode,
-                      selected: controller.selectedMode.value == mode,
-                      onTap: () => controller.selectedMode.value = mode,
-                    ),
-                  )
-                  .toList(),
+            () => EnergyModeSelector(
+              selected: controller.selectedMode.value,
+              onSelected: (mode) => controller.selectedMode.value = mode,
             ),
           ),
           const Spacer(),
           SizedBox(
             width: double.infinity,
             child: FilledButton(
-              onPressed: onContinue,
+              onPressed: controller.next,
               child: const Text('Continue'),
             ),
           ),
@@ -242,212 +383,157 @@ class _VehicleModeStep extends StatelessWidget {
 }
 
 class _VehicleDetailsStep extends StatelessWidget {
-  const _VehicleDetailsStep({
-    required this.controller,
-    required this.onBack,
-    required this.onSubmit,
-  });
-
-  final OnboardingController controller;
-  final VoidCallback onBack;
-  final Future<void> Function() onSubmit;
+  const _VehicleDetailsStep();
 
   @override
   Widget build(BuildContext context) {
-    return Padding(
-      padding: const EdgeInsets.all(20),
-      child: Column(
-        children: [
-          Row(
-            children: [
-              IconButton(
-                onPressed: onBack,
-                icon: const Icon(Icons.arrow_back),
-              ),
-              Text(
-                'Tell us about your vehicle',
-                style: Theme.of(context).textTheme.titleLarge?.copyWith(
-                      fontWeight: FontWeight.w700,
-                    ),
-              ),
-            ],
-          ),
-          const SizedBox(height: 10),
-          Expanded(
-            child: ListView(
-              children: [
-                Obx(
-                  () => DropdownButtonFormField<String>(
-                    initialValue: controller.selectedVehicleType.value,
-                    decoration: const InputDecoration(labelText: 'Vehicle type'),
-                    items: const [
-                      DropdownMenuItem(value: 'Car', child: Text('Car')),
-                      DropdownMenuItem(value: 'Motorbike', child: Text('Motorbike')),
-                      DropdownMenuItem(value: 'Truck', child: Text('Truck')),
-                    ],
-                    onChanged: (value) {
-                      if (value != null) {
-                        controller.selectedVehicleType.value = value;
-                      }
-                    },
+    final theme = Theme.of(context);
+    final controller = Get.find<OnboardingController>();
+    return Column(
+      children: [
+        Expanded(
+          child: SingleChildScrollView(
+            padding: const EdgeInsets.fromLTRB(24, 8, 24, 8),
+            child: Form(
+              key: controller.vehicleFormKey,
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    'Tell us about your vehicle',
+                    style: theme.textTheme.headlineSmall,
                   ),
-                ),
-                const SizedBox(height: 12),
-                TextField(
-                  controller: controller.vehicleNameController,
-                  decoration: const InputDecoration(labelText: 'Vehicle nickname'),
-                ),
-                const SizedBox(height: 12),
-                TextField(
-                  controller: controller.makeModelController,
-                  decoration: const InputDecoration(labelText: 'Make / Model'),
-                ),
-                const SizedBox(height: 12),
-                Row(
-                  children: [
-                    Expanded(
-                      child: TextField(
-                        controller: controller.yearController,
-                        keyboardType: TextInputType.number,
-                        decoration: const InputDecoration(labelText: 'Year'),
-                      ),
+                  const SizedBox(height: 6),
+                  Text(
+                    'You can edit this later anytime.',
+                    style: theme.textTheme.bodyMedium?.copyWith(
+                      color: AppColors.textSecondary,
                     ),
-                    const SizedBox(width: 10),
-                    Expanded(
-                      child: TextField(
-                        controller: controller.odometerController,
-                        keyboardType: TextInputType.number,
-                        decoration: const InputDecoration(
-                          labelText: 'Current odometer',
+                  ),
+                  const SizedBox(height: 22),
+                  AppTextField(
+                    controller: controller.vehicleNameController,
+                    label: 'Vehicle Nickname',
+                    hint: 'My Car',
+                    validator: (v) =>
+                        controller.validateRequired(v, 'Nickname'),
+                  ),
+                  const SizedBox(height: 16),
+                  AppTextField(
+                    controller: controller.makeModelController,
+                    label: 'Make / Model',
+                    hint: 'Toyota Prius',
+                    validator: (v) =>
+                        controller.validateRequired(v, 'Make / Model'),
+                  ),
+                  const SizedBox(height: 16),
+                  Text(
+                    'Vehicle Type',
+                    style: theme.textTheme.bodyMedium?.copyWith(
+                      fontWeight: FontWeight.w600,
+                    ),
+                  ),
+                  const SizedBox(height: 8),
+                  Obx(
+                    () => DropdownButtonFormField<String>(
+                      initialValue: controller.selectedVehicleType.value,
+                      items: OnboardingController.vehicleTypes
+                          .map(
+                            (t) => DropdownMenuItem(value: t, child: Text(t)),
+                          )
+                          .toList(),
+                      onChanged: (value) {
+                        if (value != null) {
+                          controller.selectedVehicleType.value = value;
+                        }
+                      },
+                    ),
+                  ),
+                  const SizedBox(height: 16),
+                  Row(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Expanded(
+                        child: AppTextField(
+                          controller: controller.yearController,
+                          label: 'Year (Optional)',
+                          hint: '2018',
+                          numeric: true,
+                          validator: controller.validateYear,
                         ),
                       ),
-                    ),
-                  ],
-                ),
-                const SizedBox(height: 12),
-                Obx(
-                  () {
+                      const SizedBox(width: 12),
+                      Expanded(
+                        child: AppTextField(
+                          controller: controller.odometerController,
+                          label: 'Odometer',
+                          hint: '0',
+                          numeric: true,
+                          validator: controller.validateOdometer,
+                        ),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 16),
+                  Obx(() {
                     final mode = controller.selectedMode.value;
                     return Column(
                       children: [
-                        if (mode == EnergyMode.fuel || mode == EnergyMode.hybrid)
-                          TextField(
+                        if (mode.usesFuel)
+                          AppTextField(
                             controller: controller.claimedMpgController,
-                            keyboardType: TextInputType.number,
-                            decoration: const InputDecoration(
-                              labelText: 'Claimed MPG (optional)',
-                            ),
+                            label: 'Claimed MPG (Optional)',
+                            hint: '58.0',
+                            numeric: true,
                           ),
-                        if (mode == EnergyMode.fuel || mode == EnergyMode.hybrid)
-                          const SizedBox(height: 12),
-                        if (mode == EnergyMode.charge || mode == EnergyMode.hybrid)
-                          TextField(
+                        if (mode.usesFuel) const SizedBox(height: 16),
+                        if (mode.usesCharge)
+                          AppTextField(
+                            controller: controller.claimedMiPerKwhController,
+                            label: 'Claimed mi/kWh (Optional)',
+                            hint: '4.2',
+                            numeric: true,
+                          ),
+                        if (mode.usesCharge) const SizedBox(height: 16),
+                        if (mode.usesCharge)
+                          AppTextField(
                             controller: controller.batteryCapacityController,
-                            keyboardType: TextInputType.number,
-                            decoration: const InputDecoration(
-                              labelText: 'Battery capacity kWh (optional)',
-                            ),
+                            label: 'Battery Capacity kWh (Optional)',
+                            hint: '40',
+                            numeric: true,
                           ),
                       ],
                     );
-                  },
-                ),
-              ],
-            ),
-          ),
-          const SizedBox(height: 12),
-          SizedBox(
-            width: double.infinity,
-            child: FilledButton(
-              onPressed: onSubmit,
-              child: const Text('Save & Continue'),
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-}
-
-class _EnergyModeTile extends StatelessWidget {
-  const _EnergyModeTile({
-    required this.mode,
-    required this.selected,
-    required this.onTap,
-  });
-
-  final EnergyMode mode;
-  final bool selected;
-  final VoidCallback onTap;
-
-  @override
-  Widget build(BuildContext context) {
-    return Card(
-      margin: const EdgeInsets.only(bottom: 10),
-      color: selected ? AppColors.primary.withValues(alpha: 0.1) : null,
-      child: InkWell(
-        borderRadius: BorderRadius.circular(12),
-        onTap: onTap,
-        child: Padding(
-          padding: const EdgeInsets.all(12),
-          child: Row(
-            children: [
-              Icon(
-                mode == EnergyMode.fuel
-                    ? Icons.local_gas_station
-                    : mode == EnergyMode.charge
-                        ? Icons.bolt
-                        : Icons.auto_awesome_motion_rounded,
+                  }),
+                ],
               ),
-              const SizedBox(width: 12),
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      mode.title,
-                      style: const TextStyle(fontWeight: FontWeight.w700),
-                    ),
-                    Text(
-                      mode.subtitle,
-                      style: const TextStyle(color: AppColors.textSecondary),
-                    ),
-                  ],
-                ),
-              ),
-              if (selected)
-                const Icon(
-                  Icons.check_circle,
-                  color: AppColors.primary,
-                ),
-            ],
+            ),
           ),
         ),
-      ),
-    );
-  }
-}
-
-class _BulletText extends StatelessWidget {
-  const _BulletText(this.text);
-
-  final String text;
-
-  @override
-  Widget build(BuildContext context) {
-    return Padding(
-      padding: const EdgeInsets.only(bottom: 8),
-      child: Row(
-        children: [
-          const Icon(
-            Icons.check_circle_outline,
-            color: AppColors.primary,
-            size: 18,
+        Padding(
+          padding: const EdgeInsets.fromLTRB(24, 8, 24, 16),
+          child: SizedBox(
+            width: double.infinity,
+            child: Obx(
+              () => FilledButton(
+                onPressed: controller.isSubmitting.value
+                    ? null
+                    : controller.finish,
+                child: controller.isSubmitting.value
+                    ? const SizedBox(
+                        height: 22,
+                        width: 22,
+                        child: CircularProgressIndicator(
+                          strokeWidth: 2,
+                          color: Colors.white,
+                        ),
+                      )
+                    : const Text('Save & Continue'),
+              ),
+            ),
           ),
-          const SizedBox(width: 8),
-          Expanded(child: Text(text)),
-        ],
-      ),
+        ),
+      ],
     );
   }
 }

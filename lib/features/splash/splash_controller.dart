@@ -14,13 +14,16 @@ class SplashController extends GetxController {
 
   Future<void> _navigateByState() async {
     await Future<void>.delayed(AppConstants.splashDuration);
-    if (Get.currentRoute != AppRoutes.splash) {
-      return;
-    }
+    if (!isClosed && Get.currentRoute != AppRoutes.splash) return;
+
+    await _data.hydrate();
+
+    if (!isClosed && Get.currentRoute != AppRoutes.splash) return;
+
     if (!_data.onboardingComplete.value || !_data.loggedIn.value) {
-      Get.offAllNamed(AppRoutes.onboarding);
+      await Get.offAllNamed(AppRoutes.onboarding);
       return;
     }
-    Get.offAllNamed(AppRoutes.home);
+    await Get.offAllNamed(AppRoutes.main);
   }
 }

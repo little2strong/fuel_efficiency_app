@@ -10,6 +10,7 @@ class VehicleModel {
     required this.makeModel,
     required this.year,
     this.manufacturerMpgClaim,
+    this.manufacturerMiPerKwhClaim,
     this.batteryKwhCapacity,
     this.odometer = 0,
   });
@@ -23,6 +24,7 @@ class VehicleModel {
   final String makeModel;
   final int year;
   final double? manufacturerMpgClaim;
+  final double? manufacturerMiPerKwhClaim;
   final double? batteryKwhCapacity;
   final double odometer;
 
@@ -35,6 +37,8 @@ class VehicleModel {
     int? year,
     double? manufacturerMpgClaim,
     bool clearManufacturerClaim = false,
+    double? manufacturerMiPerKwhClaim,
+    bool clearManufacturerMiPerKwhClaim = false,
     double? batteryKwhCapacity,
     bool clearBatteryCapacity = false,
     double? odometer,
@@ -49,6 +53,9 @@ class VehicleModel {
       manufacturerMpgClaim: clearManufacturerClaim
           ? null
           : manufacturerMpgClaim ?? this.manufacturerMpgClaim,
+      manufacturerMiPerKwhClaim: clearManufacturerMiPerKwhClaim
+          ? null
+          : manufacturerMiPerKwhClaim ?? this.manufacturerMiPerKwhClaim,
       batteryKwhCapacity: clearBatteryCapacity
           ? null
           : batteryKwhCapacity ?? this.batteryKwhCapacity,
@@ -57,16 +64,17 @@ class VehicleModel {
   }
 
   Map<String, dynamic> toJson() => {
-        'id': id,
-        'name': name,
-        'energyMode': energyMode.storageValue,
-        'vehicleType': vehicleType,
-        'makeModel': makeModel,
-        'year': year,
-        'manufacturerMpgClaim': manufacturerMpgClaim,
-        'batteryKwhCapacity': batteryKwhCapacity,
-        'odometer': odometer,
-      };
+    'id': id,
+    'name': name,
+    'energyMode': energyMode.storageValue,
+    'vehicleType': vehicleType,
+    'makeModel': makeModel,
+    'year': year,
+    'manufacturerMpgClaim': manufacturerMpgClaim,
+    'manufacturerMiPerKwhClaim': manufacturerMiPerKwhClaim,
+    'batteryKwhCapacity': batteryKwhCapacity,
+    'odometer': odometer,
+  };
 
   factory VehicleModel.fromJson(Map<String, dynamic> json) {
     return VehicleModel(
@@ -78,8 +86,9 @@ class VehicleModel {
       vehicleType: json['vehicleType'] as String? ?? 'Car',
       makeModel: json['makeModel'] as String? ?? (json['name'] as String),
       year: (json['year'] as num?)?.toInt() ?? DateTime.now().year,
-      manufacturerMpgClaim:
-          (json['manufacturerMpgClaim'] as num?)?.toDouble(),
+      manufacturerMpgClaim: (json['manufacturerMpgClaim'] as num?)?.toDouble(),
+      manufacturerMiPerKwhClaim: (json['manufacturerMiPerKwhClaim'] as num?)
+          ?.toDouble(),
       batteryKwhCapacity: (json['batteryKwhCapacity'] as num?)?.toDouble(),
       odometer: (json['odometer'] as num?)?.toDouble() ?? 0,
     );

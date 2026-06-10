@@ -28,14 +28,19 @@ void main() {
     Get.reset();
   });
 
-  testWidgets('App launches with splash screen', (WidgetTester tester) async {
+  testWidgets('App launches with splash then onboarding', (
+    WidgetTester tester,
+  ) async {
     await tester.pumpWidget(const FuelEfficiencyApp());
     await tester.pump();
 
-    expect(find.text('Fuel Efficiency Calculator'), findsOneWidget);
+    expect(find.text('Fuel Efficiency'), findsOneWidget);
     expect(find.byIcon(Icons.speed_rounded), findsOneWidget);
 
     await tester.pump(AppConstants.splashDuration);
     await tester.pumpAndSettle();
+
+    expect(find.text('Welcome!'), findsOneWidget);
+    expect(find.text('Get Started'), findsOneWidget);
   });
 }

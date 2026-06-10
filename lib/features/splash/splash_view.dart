@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
+
 import 'package:fuel_efficiency_app/core/constants/app_constants.dart';
 import 'package:fuel_efficiency_app/core/values/app_colors.dart';
 import 'package:fuel_efficiency_app/features/splash/splash_controller.dart';
@@ -9,31 +10,83 @@ class SplashView extends GetView<SplashController> {
 
   @override
   Widget build(BuildContext context) {
-    return const Scaffold(
-      backgroundColor: Colors.white,
-      body: Center(
+    final theme = Theme.of(context);
+    return Scaffold(
+      backgroundColor: AppColors.primary,
+      body: SafeArea(
         child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            Icon(
-              Icons.speed_rounded,
-              size: 72,
-              color: AppColors.primary,
-            ),
-            SizedBox(height: 16),
-            Text(
-              AppConstants.appName,
-              style: TextStyle(
-                color: AppColors.textPrimary,
-                fontSize: 24,
-                fontWeight: FontWeight.bold,
+            const Spacer(flex: 2),
+            TweenAnimationBuilder<double>(
+              duration: const Duration(milliseconds: 700),
+              curve: Curves.easeOutBack,
+              tween: Tween(begin: 0.6, end: 1),
+              builder: (context, scale, child) =>
+                  Transform.scale(scale: scale, child: child),
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Container(
+                    height: 110,
+                    width: 110,
+                    decoration: BoxDecoration(
+                      color: Colors.white,
+                      borderRadius: BorderRadius.circular(28),
+                      boxShadow: [
+                        BoxShadow(
+                          color: Colors.black.withValues(alpha: 0.15),
+                          blurRadius: 24,
+                          offset: const Offset(0, 10),
+                        ),
+                      ],
+                    ),
+                    child: const Icon(
+                      Icons.speed_rounded,
+                      size: 60,
+                      color: AppColors.primary,
+                    ),
+                  ),
+                  const SizedBox(height: 26),
+                  Text(
+                    'Fuel Efficiency',
+                    style: theme.textTheme.headlineSmall?.copyWith(
+                      color: Colors.white,
+                      fontWeight: FontWeight.w800,
+                    ),
+                  ),
+                  const SizedBox(height: 2),
+                  Text(
+                    'Calculator',
+                    style: theme.textTheme.titleMedium?.copyWith(
+                      color: Colors.white.withValues(alpha: 0.9),
+                      letterSpacing: 2,
+                    ),
+                  ),
+                ],
               ),
             ),
-            SizedBox(height: 6),
-            Text(
-              'Track real efficiency. See the real difference.',
-              style: TextStyle(color: AppColors.textSecondary),
+            const Spacer(),
+            Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 40),
+              child: Text(
+                AppConstants.appTagline,
+                textAlign: TextAlign.center,
+                style: theme.textTheme.bodyMedium?.copyWith(
+                  color: Colors.white.withValues(alpha: 0.9),
+                  height: 1.4,
+                ),
+              ),
             ),
+            const Spacer(),
+            const SizedBox(
+              height: 28,
+              width: 28,
+              child: CircularProgressIndicator(
+                strokeWidth: 2.5,
+                color: Colors.white,
+              ),
+            ),
+            const SizedBox(height: 32),
           ],
         ),
       ),
