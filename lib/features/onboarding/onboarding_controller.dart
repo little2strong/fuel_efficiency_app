@@ -2,13 +2,16 @@ import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 
 import 'package:fuel_efficiency_app/app/routes/app_routes.dart';
+import 'package:fuel_efficiency_app/core/services/auth_service.dart';
+import 'package:fuel_efficiency_app/core/utils/auth_error_messages.dart';
 import 'package:fuel_efficiency_app/features/shared/app_data_controller.dart';
 import 'package:fuel_efficiency_app/features/shared/app_enums.dart';
 
 class OnboardingController extends GetxController {
-  OnboardingController(this._data);
+  OnboardingController(this._data, this._auth);
 
   final AppDataController _data;
+  final AuthService _auth;
 
   /// 0 = Welcome, 1 = Auth, 2 = Vehicle mode, 3 = Vehicle details.
   final RxInt step = 0.obs;
@@ -19,6 +22,7 @@ class OnboardingController extends GetxController {
   final RxBool isSignUp = true.obs;
   final RxBool obscurePassword = true.obs;
   final RxBool isSubmitting = false.obs;
+  final RxBool isAuthLoading = false.obs;
 
   static const vehicleTypes = ['Car', 'SUV', 'Van', 'Truck', 'Motorbike'];
 
@@ -35,6 +39,15 @@ class OnboardingController extends GetxController {
   final claimedMpgController = TextEditingController();
   final claimedMiPerKwhController = TextEditingController();
   final batteryCapacityController = TextEditingController();
+
+  @override
+  void onInit() {
+    super.onInit();
+    if (_data.onboardingComplete.value) {
+      step.value = 1;
+      isSignUp.value = false;
+    }
+  }
 
   void next() {
     if (step.value < lastStep) step.value += 1;
@@ -88,33 +101,99 @@ class OnboardingController extends GetxController {
     return null;
   }
 
-  /// Static auth — validates form then advances to vehicle setup.
-  void submitAuth() {
+  Future<void> submitAuth() async {
     if (!(loginFormKey.currentState?.validate() ?? false)) return;
-    next();
+
+    isAuthLoading.value = true;
+    try {
+      final email = emailController.text.trim();
+      final password = passwordController.text;
+      final name = nameController.text.trim();
+
+      if (isSignUp.value) {
+        await _auth.signUp(
+          email: email,
+          password: password,
+          displayName: name,
+        );
+      } else {
+        await _auth.signIn(email: email, password: password);
+      }
+
+      await _auth.syncSession(_data);
+
+      if (_data.onboardingComplete.value) {
+        Get.offAllNamed(AppRoutes.main);
+        return;
+      }
+
+      if (isSignUp.value && name.isNotEmpty) {
+        nameController.text = name;
+      }
+
+      next();
+    } catch (error) {
+      Get.snackbar(
+        isSignUp.value ? 'Sign up failed' : 'Log in failed',
+        authErrorMessage(error),
+        snackPosition: SnackPosition.BOTTOM,
+      );
+    } finally {
+      isAuthLoading.value = false;
+    }
   }
 
-  /// Static social auth — pre-fills profile fields and advances.
-  void socialSignIn(String provider) {
-    if (nameController.text.trim().isEmpty) {
-      nameController.text = provider == 'apple' ? 'Apple User' : 'Google User';
+  Future<void> resetPassword() async {
+    final email = emailController.text.trim();
+    if (email.isEmpty) {
+      Get.snackbar(
+        'Email required',
+        'Enter your email address first.',
+        snackPosition: SnackPosition.BOTTOM,
+      );
+      return;
     }
-    if (emailController.text.trim().isEmpty) {
-      emailController.text =
-          '${provider == 'apple' ? 'apple' : 'google'}.user@example.com';
+    if (validateEmail(email) != null) {
+      Get.snackbar(
+        'Invalid email',
+        'Enter a valid email address.',
+        snackPosition: SnackPosition.BOTTOM,
+      );
+      return;
     }
-    next();
+
+    isAuthLoading.value = true;
+    try {
+      await _auth.sendPasswordResetEmail(email);
+      Get.snackbar(
+        'Reset email sent',
+        'Check your inbox for password reset instructions.',
+        snackPosition: SnackPosition.BOTTOM,
+        duration: const Duration(seconds: 4),
+      );
+    } catch (error) {
+      Get.snackbar(
+        'Reset failed',
+        authErrorMessage(error),
+        snackPosition: SnackPosition.BOTTOM,
+      );
+    } finally {
+      isAuthLoading.value = false;
+    }
   }
 
   Future<void> finish() async {
     if (!(vehicleFormKey.currentState?.validate() ?? false)) return;
     isSubmitting.value = true;
 
-    final displayName = nameController.text.trim().isEmpty
-        ? 'Driver'
-        : nameController.text.trim();
-    final email = emailController.text.trim().isEmpty
-        ? 'driver@example.com'
+    final user = _auth.currentUser;
+    final displayName = user?.displayName?.trim().isNotEmpty == true
+        ? user!.displayName!.trim()
+        : (nameController.text.trim().isEmpty
+              ? 'Driver'
+              : nameController.text.trim());
+    final email = user?.email?.trim().isNotEmpty == true
+        ? user!.email!.trim()
         : emailController.text.trim();
 
     await _data.updateSession(
@@ -122,6 +201,7 @@ class OnboardingController extends GetxController {
       loggedInState: true,
       name: displayName,
       email: email,
+      uid: user?.uid,
     );
 
     await _data.addVehicle(

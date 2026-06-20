@@ -31,6 +31,7 @@ class AppDataController extends GetxController {
   final RxBool loggedIn = false.obs;
   final RxString userName = ''.obs;
   final RxString userEmail = ''.obs;
+  final RxString userId = ''.obs;
 
   // Settings
   final RxString distanceUnit = AppConstants.defaultDistanceUnit.obs;
@@ -59,6 +60,7 @@ class AppDataController extends GetxController {
     loggedIn.value = _storage.read<bool>(AppConstants.keyLoggedIn) ?? false;
     userName.value = _storage.read<String>(AppConstants.keyUserName) ?? '';
     userEmail.value = _storage.read<String>(AppConstants.keyUserEmail) ?? '';
+    userId.value = _storage.read<String>(AppConstants.keyUserId) ?? '';
 
     distanceUnit.value =
         _storage.read<String>(AppConstants.keyDistanceUnit) ??
@@ -167,6 +169,7 @@ class AppDataController extends GetxController {
     await _storage.write(AppConstants.keyLoggedIn, loggedIn.value);
     await _storage.write(AppConstants.keyUserName, userName.value);
     await _storage.write(AppConstants.keyUserEmail, userEmail.value);
+    await _storage.write(AppConstants.keyUserId, userId.value);
   }
 
   Future<void> _persistSettings() async {
@@ -206,11 +209,35 @@ class AppDataController extends GetxController {
     required bool loggedInState,
     required String name,
     required String email,
+    String? uid,
   }) async {
     onboardingComplete.value = completedOnboarding;
     loggedIn.value = loggedInState;
     userName.value = name;
     userEmail.value = email;
+    if (uid != null) userId.value = uid;
+    await _persistSession();
+  }
+
+  /// Updates local session from a signed-in Firebase user.
+  Future<void> syncAuthUser({
+    required String uid,
+    required String name,
+    required String email,
+  }) async {
+    loggedIn.value = true;
+    userId.value = uid;
+    if (name.isNotEmpty) userName.value = name;
+    if (email.isNotEmpty) userEmail.value = email;
+    await _persistSession();
+  }
+
+  /// Clears auth state while keeping onboarding and app data.
+  Future<void> clearAuthSession() async {
+    loggedIn.value = false;
+    userId.value = '';
+    userName.value = '';
+    userEmail.value = '';
     await _persistSession();
   }
 
@@ -563,6 +590,7 @@ class AppDataController extends GetxController {
     loggedIn.value = false;
     userName.value = '';
     userEmail.value = '';
+    userId.value = '';
     selectedVehicleId.value = '';
     vehicles.clear();
     entries.clear();
@@ -571,7 +599,6 @@ class AppDataController extends GetxController {
   }
 
   Future<void> logout() async {
-    loggedIn.value = false;
-    await _storage.write(AppConstants.keyLoggedIn, false);
+    await clearAuthSession();
   }
 }

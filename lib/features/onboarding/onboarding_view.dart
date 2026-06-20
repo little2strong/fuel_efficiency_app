@@ -200,6 +200,7 @@ class _LoginStep extends StatelessWidget {
       padding: const EdgeInsets.all(24),
       child: Obx(() {
         final signUp = controller.isSignUp.value;
+        final authLoading = controller.isAuthLoading.value;
         return Form(
           key: controller.loginFormKey,
           child: Column(
@@ -220,29 +221,6 @@ class _LoginStep extends StatelessWidget {
                 ),
               ),
               const SizedBox(height: 24),
-              OutlinedButton.icon(
-                onPressed: () => controller.socialSignIn('google'),
-                icon: const Icon(Icons.g_mobiledata_rounded, size: 28),
-                label: const Text('Continue with Google'),
-              ),
-              const SizedBox(height: 12),
-              OutlinedButton.icon(
-                onPressed: () => controller.socialSignIn('apple'),
-                icon: const Icon(Icons.apple, size: 22),
-                label: const Text('Continue with Apple'),
-              ),
-              const SizedBox(height: 20),
-              Row(
-                children: [
-                  const Expanded(child: Divider()),
-                  Padding(
-                    padding: const EdgeInsets.symmetric(horizontal: 12),
-                    child: Text('or', style: theme.textTheme.bodySmall),
-                  ),
-                  const Expanded(child: Divider()),
-                ],
-              ),
-              const SizedBox(height: 20),
               if (signUp) ...[
                 AppTextField(
                   controller: controller.nameController,
@@ -294,24 +272,29 @@ class _LoginStep extends StatelessWidget {
                 Align(
                   alignment: Alignment.centerRight,
                   child: TextButton(
-                    onPressed: () => Get.snackbar(
-                      'Password reset',
-                      'Password reset is not available in this demo build.',
-                      snackPosition: SnackPosition.BOTTOM,
-                    ),
+                    onPressed: authLoading ? null : controller.resetPassword,
                     child: const Text('Forgot Password?'),
                   ),
                 ),
               ],
               const SizedBox(height: 12),
               FilledButton(
-                onPressed: controller.submitAuth,
-                child: Text(signUp ? 'Sign Up' : 'Log In'),
+                onPressed: authLoading ? null : controller.submitAuth,
+                child: authLoading
+                    ? const SizedBox(
+                        height: 22,
+                        width: 22,
+                        child: CircularProgressIndicator(
+                          strokeWidth: 2,
+                          color: Colors.white,
+                        ),
+                      )
+                    : Text(signUp ? 'Sign Up' : 'Log In'),
               ),
               const SizedBox(height: 12),
               Center(
                 child: TextButton(
-                  onPressed: controller.toggleAuthMode,
+                  onPressed: authLoading ? null : controller.toggleAuthMode,
                   child: Text.rich(
                     TextSpan(
                       text: signUp

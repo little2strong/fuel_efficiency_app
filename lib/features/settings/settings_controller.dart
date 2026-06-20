@@ -3,6 +3,7 @@ import 'package:get/get.dart';
 
 import 'package:fuel_efficiency_app/core/constants/app_constants.dart';
 import 'package:fuel_efficiency_app/core/utils/app_logger.dart';
+import 'package:fuel_efficiency_app/core/services/auth_service.dart';
 import 'package:fuel_efficiency_app/features/shared/app_data_controller.dart';
 
 class SettingsController extends GetxController {
@@ -113,9 +114,15 @@ class SettingsController extends GetxController {
     }
   }
 
-  Future<void> logout() => _data.logout();
+  Future<void> logout() async {
+    await Get.find<AuthService>().signOut();
+    await _data.logout();
+  }
 
-  Future<void> resetAll() => _data.clearAllData();
+  Future<void> resetAll() async {
+    await Get.find<AuthService>().signOut();
+    await _data.clearAllData();
+  }
 
   Future<void> updateProfile({required String name, required String email}) =>
       _data.updateProfile(name: name, email: email);

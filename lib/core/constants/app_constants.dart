@@ -12,6 +12,7 @@ abstract final class AppConstants {
   static const String keyLoggedIn = 'logged_in';
   static const String keyUserName = 'user_name';
   static const String keyUserEmail = 'user_email';
+  static const String keyUserId = 'user_id';
 
   // Settings keys
   static const String keySelectedVehicleId = 'selected_vehicle_id';

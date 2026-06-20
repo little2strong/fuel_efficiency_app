@@ -1,3 +1,4 @@
+import 'package:firebase_core/firebase_core.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:get/get.dart';
@@ -17,6 +18,17 @@ class _FakePathProvider extends Fake
 void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
   PathProviderPlatform.instance = _FakePathProvider();
+
+  setUpAll(() async {
+    await Firebase.initializeApp(
+      options: const FirebaseOptions(
+        apiKey: 'test-api-key',
+        appId: '1:000000000000:android:0000000000000000000000',
+        messagingSenderId: '000000000000',
+        projectId: 'test-project',
+      ),
+    );
+  });
 
   setUp(() async {
     await GetStorage.init(AppConstants.storageBoxName);
