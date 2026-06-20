@@ -7,9 +7,9 @@
   "client": [
     {
       "client_info": {
-        "mobilesdk_app_id": "1:316843975513:android:4e562acbfcfaa6b47de248",
+        "mobilesdk_app_id": "1:316843975513:android:6df9ef844cfee5b07de248",
         "android_client_info": {
-          "package_name": "com.example.fuel_efficiency_app"
+          "package_name": "com.ait.fuel_efficiency"
         }
       },
       "oauth_client": [],

@@ -26,10 +26,7 @@ class DefaultFirebaseOptions {
       case TargetPlatform.android:
         return android;
       case TargetPlatform.iOS:
-        throw UnsupportedError(
-          'DefaultFirebaseOptions have not been configured for ios - '
-          'you can reconfigure this by running the FlutterFire CLI again.',
-        );
+        return ios;
       case TargetPlatform.macOS:
         throw UnsupportedError(
           'DefaultFirebaseOptions have not been configured for macos - '
@@ -54,9 +51,17 @@ class DefaultFirebaseOptions {
 
   static const FirebaseOptions android = FirebaseOptions(
     apiKey: 'AIzaSyAb3Y9R7Uirjijkglo4zc82t5l3exWvbSM',
-    appId: '1:316843975513:android:4e562acbfcfaa6b47de248',
+    appId: '1:316843975513:android:6df9ef844cfee5b07de248',
     messagingSenderId: '316843975513',
     projectId: 'fuel-efficiency-6d241',
     storageBucket: 'fuel-efficiency-6d241.firebasestorage.app',
+  );
+  static const FirebaseOptions ios = FirebaseOptions(
+    apiKey: 'AIzaSyBMMGbYxfL7C2QLQPwYWQR60jyZe6CVzGQ',
+    appId: '1:316843975513:ios:6a5946f3070b44d17de248',
+    messagingSenderId: '316843975513',
+    projectId: 'fuel-efficiency-6d241',
+    storageBucket: 'fuel-efficiency-6d241.firebasestorage.app',
+    iosBundleId: 'com.ait.fuel-efficiency',
   );
 }

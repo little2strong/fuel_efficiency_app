@@ -1,4 +1,4 @@
-package com.example.fuel_efficiency_app
+package com.ait.fuel_efficiency
 
 import io.flutter.embedding.android.FlutterActivity
 

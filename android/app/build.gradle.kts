@@ -8,7 +8,7 @@ plugins {
 }
 
 android {
-    namespace = "com.example.fuel_efficiency_app"
+    namespace = "com.ait.fuel_efficiency"
     compileSdk = flutter.compileSdkVersion
     ndkVersion = flutter.ndkVersion
 
@@ -19,7 +19,7 @@ android {
 
     defaultConfig {
         // TODO: Specify your own unique Application ID (https://developer.android.com/studio/build/application-id.html).
-        applicationId = "com.example.fuel_efficiency_app"
+        applicationId = "com.ait.fuel_efficiency"
         // You can update the following values to match your application needs.
         // For more information, see: https://flutter.dev/to/review-gradle-config.
         minSdk = flutter.minSdkVersion
