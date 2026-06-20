@@ -1,1 +1,1 @@
-{}
+{"onboarding_complete":false,"logged_in":false,"user_name":"","user_email":"","user_id":""}
