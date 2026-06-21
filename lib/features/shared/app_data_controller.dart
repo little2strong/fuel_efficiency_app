@@ -61,48 +61,58 @@ class AppDataController extends GetxController {
   }
 
   Future<void> hydrate() async {
-    onboardingComplete.value =
-        _storage.read<bool>(AppConstants.keyOnboardingComplete) ?? false;
-    loggedIn.value = _storage.read<bool>(AppConstants.keyLoggedIn) ?? false;
-    userName.value = _storage.read<String>(AppConstants.keyUserName) ?? '';
-    userEmail.value = _storage.read<String>(AppConstants.keyUserEmail) ?? '';
-    userId.value = _storage.read<String>(AppConstants.keyUserId) ?? '';
+    try {
+      onboardingComplete.value =
+          _storage.read<bool>(AppConstants.keyOnboardingComplete) ?? false;
+      loggedIn.value = _storage.read<bool>(AppConstants.keyLoggedIn) ?? false;
+      userName.value = _storage.read<String>(AppConstants.keyUserName) ?? '';
+      userEmail.value = _storage.read<String>(AppConstants.keyUserEmail) ?? '';
+      userId.value = _storage.read<String>(AppConstants.keyUserId) ?? '';
 
-    distanceUnit.value =
-        _storage.read<String>(AppConstants.keyDistanceUnit) ??
-        AppConstants.defaultDistanceUnit;
-    volumeUnit.value =
-        _storage.read<String>(AppConstants.keyVolumeUnit) ??
-        AppConstants.defaultVolumeUnit;
-    currencySymbol.value =
-        _storage.read<String>(AppConstants.keyCurrencySymbol) ??
-        AppConstants.defaultCurrencySymbol;
-    themeMode.value = _themeFromString(
-      _storage.read<String>(AppConstants.keyThemeMode),
-    );
-    notificationsEnabled.value =
-        _storage.read<bool>(AppConstants.keyNotifications) ?? true;
-    defaultFuelPrice.value =
-        (_storage.read<num>(AppConstants.keyFuelPrice) ??
-                AppConstants.defaultFuelPricePerLitre)
-            .toDouble();
-    defaultElectricityPrice.value =
-        (_storage.read<num>(AppConstants.keyElectricityPrice) ??
-                AppConstants.defaultElectricityPricePerKwh)
-            .toDouble();
+      distanceUnit.value =
+          _storage.read<String>(AppConstants.keyDistanceUnit) ??
+          AppConstants.defaultDistanceUnit;
+      volumeUnit.value =
+          _storage.read<String>(AppConstants.keyVolumeUnit) ??
+          AppConstants.defaultVolumeUnit;
+      currencySymbol.value =
+          _storage.read<String>(AppConstants.keyCurrencySymbol) ??
+          AppConstants.defaultCurrencySymbol;
+      themeMode.value = _themeFromString(
+        _storage.read<String>(AppConstants.keyThemeMode),
+      );
+      notificationsEnabled.value =
+          _storage.read<bool>(AppConstants.keyNotifications) ?? true;
+      defaultFuelPrice.value =
+          (_storage.read<num>(AppConstants.keyFuelPrice) ??
+                  AppConstants.defaultFuelPricePerLitre)
+              .toDouble();
+      defaultElectricityPrice.value =
+          (_storage.read<num>(AppConstants.keyElectricityPrice) ??
+                  AppConstants.defaultElectricityPricePerKwh)
+              .toDouble();
 
-    vehicles.assignAll(VehicleModel.loadAll(_storage));
-    entries
-      ..assignAll(FuelEntryModel.loadAll(_storage))
-      ..sort((a, b) => b.date.compareTo(a.date));
+      vehicles.assignAll(VehicleModel.loadAll(_storage));
+      entries
+        ..assignAll(FuelEntryModel.loadAll(_storage))
+        ..sort((a, b) => b.date.compareTo(a.date));
 
-    selectedVehicleId.value =
-        _storage.read<String>(AppConstants.keySelectedVehicleId) ?? '';
-    if (selectedVehicleId.value.isEmpty && vehicles.isNotEmpty) {
-      selectedVehicleId.value = vehicles.first.id;
+      selectedVehicleId.value =
+          _storage.read<String>(AppConstants.keySelectedVehicleId) ?? '';
+      if (selectedVehicleId.value.isEmpty && vehicles.isNotEmpty) {
+        selectedVehicleId.value = vehicles.first.id;
+      }
+
+      if (_purgeLegacyDemoDataLocal()) {
+        await _persistVehicles();
+        await _persistEntries();
+        await _persistSettings();
+      }
+    } catch (error, stackTrace) {
+      AppLogger.error('Hydrate failed', error, stackTrace);
+    } finally {
+      isHydrated.value = true;
     }
-    await _purgeLegacyDemoData();
-    isHydrated.value = true;
   }
 
   /// Pulls cloud data after sign-in, or uploads local data on first sync.
@@ -116,8 +126,12 @@ class AppDataController extends GetxController {
       if (cloud.hasRemoteData) {
         _applyCloudData(cloud);
       }
-      final purged = await _purgeLegacyDemoData();
+      final legacyDemoIds = _legacyDemoVehicleIds();
+      final purged = _purgeLegacyDemoDataLocal();
       await _persistAllLocally();
+      if (purged && legacyDemoIds.isNotEmpty) {
+        await _purgeLegacyDemoDataCloud(legacyDemoIds);
+      }
       if (!cloud.hasRemoteData || purged) {
         await _pushAllToCloud();
       }
@@ -182,14 +196,17 @@ class AppDataController extends GetxController {
     final uid = _uid;
     if (uid == null) return;
 
-    await _firestore.pushAllData(
-      uid: uid,
-      displayName: userName.value,
-      email: userEmail.value,
-      onboardingComplete: onboardingComplete.value,
-      settings: _settingsToCloud(),
-      vehicles: vehicles.toList(),
-      entries: entries.toList(),
+    await _runCloud(
+      () => _firestore.pushAllData(
+        uid: uid,
+        displayName: userName.value,
+        email: userEmail.value,
+        onboardingComplete: onboardingComplete.value,
+        settings: _settingsToCloud(),
+        vehicles: vehicles.toList(),
+        entries: entries.toList(),
+      ),
+      'Cloud full sync failed',
     );
   }
 
@@ -197,21 +214,44 @@ class AppDataController extends GetxController {
     final uid = _uid;
     if (uid == null) return;
 
-    await _firestore.saveUserProfile(
-      uid: uid,
-      displayName: userName.value,
-      email: userEmail.value,
-      onboardingComplete: onboardingComplete.value,
-      settings: _settingsToCloud(),
+    await _runCloud(
+      () => _firestore.saveUserProfile(
+        uid: uid,
+        displayName: userName.value,
+        email: userEmail.value,
+        onboardingComplete: onboardingComplete.value,
+        settings: _settingsToCloud(),
+      ),
+      'Cloud profile sync failed',
     );
   }
 
-  /// Removes bundled demo vehicles/entries from older app versions.
-  Future<bool> _purgeLegacyDemoData() async {
-    final demoVehicleIds = vehicles
-        .where((vehicle) => vehicle.id.startsWith('demo-'))
-        .map((vehicle) => vehicle.id)
-        .toList();
+  Future<void> _runCloud(
+    Future<void> Function() action,
+    String errorLabel,
+  ) async {
+    if (!_useCloud) return;
+    try {
+      await action();
+    } catch (error, stackTrace) {
+      AppLogger.error(errorLabel, error, stackTrace);
+    }
+  }
+
+  void _clearUserDataInMemory() {
+    vehicles.clear();
+    entries.clear();
+    selectedVehicleId.value = '';
+  }
+
+  List<String> _legacyDemoVehicleIds() => vehicles
+      .where((vehicle) => vehicle.id.startsWith('demo-'))
+      .map((vehicle) => vehicle.id)
+      .toList();
+
+  /// Removes bundled demo vehicles/entries from local storage only.
+  bool _purgeLegacyDemoDataLocal() {
+    final demoVehicleIds = _legacyDemoVehicleIds();
     if (demoVehicleIds.isEmpty) return false;
 
     vehicles.removeWhere((vehicle) => vehicle.id.startsWith('demo-'));
@@ -221,13 +261,23 @@ class AppDataController extends GetxController {
       selectedVehicleId.value = vehicles.isNotEmpty ? vehicles.first.id : '';
     }
 
-    if (_useCloud) {
-      for (final vehicleId in demoVehicleIds) {
+    return true;
+  }
+
+  Future<void> _purgeLegacyDemoDataCloud(List<String> demoVehicleIds) async {
+    if (!_useCloud) return;
+
+    for (final vehicleId in demoVehicleIds) {
+      try {
         await _firestore.deleteVehicle(_uid!, vehicleId);
+      } catch (error, stackTrace) {
+        AppLogger.error(
+          'Failed to delete legacy demo vehicle from cloud',
+          error,
+          stackTrace,
+        );
       }
     }
-
-    return true;
   }
 
   Future<void> _persistAllLocally() async {
@@ -271,7 +321,6 @@ class AppDataController extends GetxController {
     await _storage.write(AppConstants.keyUserName, userName.value);
     await _storage.write(AppConstants.keyUserEmail, userEmail.value);
     await _storage.write(AppConstants.keyUserId, userId.value);
-    await _syncProfileToCloud();
   }
 
   Future<void> _persistSettings() async {
@@ -295,7 +344,6 @@ class AppDataController extends GetxController {
       AppConstants.keySelectedVehicleId,
       selectedVehicleId.value,
     );
-    await _syncProfileToCloud();
   }
 
   Future<void> _persistVehicles() =>
@@ -329,12 +377,24 @@ class AppDataController extends GetxController {
     required String name,
     required String email,
   }) async {
+    final previousUid = userId.value;
+    final userChanged = previousUid.isNotEmpty && previousUid != uid;
+
+    if (userChanged) {
+      _clearUserDataInMemory();
+    }
+
     loggedIn.value = true;
     userId.value = uid;
     if (name.isNotEmpty) userName.value = name;
     if (email.isNotEmpty) userEmail.value = email;
     await _persistSession();
-    await _syncProfileToCloud();
+
+    if (userChanged) {
+      await _persistVehicles();
+      await _persistEntries();
+      await _persistSettings();
+    }
   }
 
   /// Clears auth state while keeping onboarding and app data.
@@ -387,6 +447,7 @@ class AppDataController extends GetxController {
   Future<void> selectVehicle(String vehicleId) async {
     selectedVehicleId.value = vehicleId;
     await _persistSettings();
+    await _syncProfileToCloud();
   }
 
   // ---------------------------------------------------------------------------
@@ -418,7 +479,12 @@ class AppDataController extends GetxController {
     vehicles.add(vehicle);
     await _persistVehicles();
     await selectVehicle(vehicle.id);
-    if (_useCloud) await _firestore.saveVehicle(_uid!, vehicle);
+    if (_useCloud) {
+      await _runCloud(
+        () => _firestore.saveVehicle(_uid!, vehicle),
+        'Cloud vehicle save failed',
+      );
+    }
     return vehicle;
   }
 
@@ -428,7 +494,12 @@ class AppDataController extends GetxController {
     vehicles[index] = updated;
     vehicles.refresh();
     await _persistVehicles();
-    if (_useCloud) await _firestore.saveVehicle(_uid!, updated);
+    if (_useCloud) {
+      await _runCloud(
+        () => _firestore.saveVehicle(_uid!, updated),
+        'Cloud vehicle save failed',
+      );
+    }
   }
 
   Future<void> deleteVehicle(String vehicleId) async {
@@ -440,7 +511,12 @@ class AppDataController extends GetxController {
     await _persistVehicles();
     await _persistEntries();
     await _persistSettings();
-    if (_useCloud) await _firestore.deleteVehicle(_uid!, vehicleId);
+    if (_useCloud) {
+      await _runCloud(
+        () => _firestore.deleteVehicle(_uid!, vehicleId),
+        'Cloud vehicle delete failed',
+      );
+    }
   }
 
   // ---------------------------------------------------------------------------
@@ -481,7 +557,12 @@ class AppDataController extends GetxController {
     entries.refresh();
     await _persistEntries();
     await _syncVehicleOdometer(vehicleId);
-    if (_useCloud) await _firestore.saveEntry(_uid!, entry);
+    if (_useCloud) {
+      await _runCloud(
+        () => _firestore.saveEntry(_uid!, entry),
+        'Cloud entry save failed',
+      );
+    }
   }
 
   Future<void> updateEntry(FuelEntryModel updated) async {
@@ -492,7 +573,12 @@ class AppDataController extends GetxController {
     entries.refresh();
     await _persistEntries();
     await _syncVehicleOdometer(updated.vehicleId);
-    if (_useCloud) await _firestore.saveEntry(_uid!, updated);
+    if (_useCloud) {
+      await _runCloud(
+        () => _firestore.saveEntry(_uid!, updated),
+        'Cloud entry save failed',
+      );
+    }
   }
 
   Future<void> deleteEntry(String entryId) async {
@@ -500,7 +586,12 @@ class AppDataController extends GetxController {
     entries.removeWhere((e) => e.id == entryId);
     await _persistEntries();
     if (entry != null) await _syncVehicleOdometer(entry.vehicleId);
-    if (_useCloud) await _firestore.deleteEntry(_uid!, entryId);
+    if (_useCloud) {
+      await _runCloud(
+        () => _firestore.deleteEntry(_uid!, entryId),
+        'Cloud entry delete failed',
+      );
+    }
   }
 
   /// Keeps a vehicle's odometer aligned with its most recent entry.
@@ -519,7 +610,10 @@ class AppDataController extends GetxController {
     vehicles.refresh();
     await _persistVehicles();
     if (_useCloud) {
-      await _firestore.saveVehicle(_uid!, vehicles[index]);
+      await _runCloud(
+        () => _firestore.saveVehicle(_uid!, vehicles[index]),
+        'Cloud vehicle save failed',
+      );
     }
   }
 
@@ -727,5 +821,9 @@ class AppDataController extends GetxController {
 
   Future<void> logout() async {
     await clearAuthSession();
+    _clearUserDataInMemory();
+    await _persistVehicles();
+    await _persistEntries();
+    await _persistSettings();
   }
 }

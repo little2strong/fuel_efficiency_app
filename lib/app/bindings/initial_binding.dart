@@ -28,6 +28,6 @@ class InitialBinding extends Bindings {
       ),
       permanent: true,
     );
-    Get.putAsync<AuthService>(() async => AuthService().init(), permanent: true);
+    Get.put<AuthService>(AuthService(), permanent: true);
   }
 }

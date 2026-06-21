@@ -11,8 +11,17 @@ class AuthService extends GetxService {
 
   Stream<User?> get authStateChanges => _auth.authStateChanges();
 
+  bool _initialized = false;
+
   Future<AuthService> init() async {
+    await ensureInitialized();
     return this;
+  }
+
+  Future<void> ensureInitialized() async {
+    if (_initialized) return;
+    await _auth.authStateChanges().first;
+    _initialized = true;
   }
 
   Future<UserCredential> signUp({
@@ -50,7 +59,16 @@ class AuthService extends GetxService {
 
   Future<void> signOut() => _auth.signOut();
 
-  /// Mirrors the Firebase user into local session storage.
+  Future<void> updateDisplayName(String name) async {
+    final user = _auth.currentUser;
+    if (user == null) return;
+    final trimmed = name.trim();
+    if (trimmed.isEmpty) return;
+    await user.updateDisplayName(trimmed);
+    await user.reload();
+  }
+
+  /// Mirrors the Firebase user into local session storage, then syncs cloud data.
   Future<void> syncSession(AppDataController data, {User? user}) async {
     final firebaseUser = user ?? _auth.currentUser;
     if (firebaseUser == null) {

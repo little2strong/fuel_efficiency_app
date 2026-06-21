@@ -124,6 +124,11 @@ class SettingsController extends GetxController {
     await _data.clearAllData();
   }
 
-  Future<void> updateProfile({required String name, required String email}) =>
-      _data.updateProfile(name: name, email: email);
+  Future<void> updateProfile({
+    required String name,
+    required String email,
+  }) async {
+    await Get.find<AuthService>().updateDisplayName(name);
+    await _data.updateProfile(name: name, email: email);
+  }
 }

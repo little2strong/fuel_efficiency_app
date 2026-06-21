@@ -3,6 +3,7 @@ import 'package:get/get.dart';
 import 'package:fuel_efficiency_app/app/routes/app_routes.dart';
 import 'package:fuel_efficiency_app/core/constants/app_constants.dart';
 import 'package:fuel_efficiency_app/core/services/auth_service.dart';
+import 'package:fuel_efficiency_app/core/utils/app_logger.dart';
 import 'package:fuel_efficiency_app/features/shared/app_data_controller.dart';
 
 class SplashController extends GetxController {
@@ -19,8 +20,14 @@ class SplashController extends GetxController {
     await Future<void>.delayed(AppConstants.splashDuration);
     if (!isClosed && Get.currentRoute != AppRoutes.splash) return;
 
-    await _data.hydrate();
-    await _auth.syncSession(_data);
+    try {
+      // Ensure Firebase Auth has restored before reading currentUser.
+      await Get.find<AuthService>().ensureInitialized();
+      await _data.hydrate();
+      await _auth.syncSession(_data);
+    } catch (error, stackTrace) {
+      AppLogger.error('Startup failed', error, stackTrace);
+    }
 
     if (!isClosed && Get.currentRoute != AppRoutes.splash) return;
 

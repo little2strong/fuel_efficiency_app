@@ -105,11 +105,11 @@ class FirestoreService extends GetxService {
     final batch = _db.batch();
     batch.delete(_vehiclesRef(uid).doc(vehicleId));
 
-    final relatedEntries = await _entriesRef(
-      uid,
-    ).where('vehicleId', isEqualTo: vehicleId).get();
+    final relatedEntries = await _entriesRef(uid).get();
     for (final doc in relatedEntries.docs) {
-      batch.delete(doc.reference);
+      if (doc.data()['vehicleId'] == vehicleId) {
+        batch.delete(doc.reference);
+      }
     }
 
     await batch.commit();

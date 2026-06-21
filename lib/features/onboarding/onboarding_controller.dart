@@ -43,6 +43,15 @@ class OnboardingController extends GetxController {
   @override
   void onInit() {
     super.onInit();
+    final auth = _auth.currentUser;
+    if (auth != null) {
+      if (auth.email?.isNotEmpty == true) {
+        emailController.text = auth.email!;
+      }
+      if (auth.displayName?.trim().isNotEmpty == true) {
+        nameController.text = auth.displayName!.trim();
+      }
+    }
     if (_data.onboardingComplete.value) {
       step.value = 1;
       isSignUp.value = false;
@@ -123,7 +132,7 @@ class OnboardingController extends GetxController {
       await _auth.syncSession(_data);
 
       if (_data.onboardingComplete.value) {
-        Get.offAllNamed(AppRoutes.main);
+        if (!isClosed) Get.offAllNamed(AppRoutes.main);
         return;
       }
 
@@ -222,8 +231,10 @@ class OnboardingController extends GetxController {
           : null,
     );
 
+    await _data.syncFromCloud();
+
     isSubmitting.value = false;
-    Get.offAllNamed(AppRoutes.main);
+    if (!isClosed) Get.offAllNamed(AppRoutes.main);
   }
 
   @override
