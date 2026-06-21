@@ -8,7 +8,6 @@ import 'package:fuel_efficiency_app/core/utils/app_logger.dart';
 import 'package:fuel_efficiency_app/features/fuel/fuel_entry_model.dart';
 import 'package:fuel_efficiency_app/features/shared/app_enums.dart';
 import 'package:fuel_efficiency_app/features/shared/data_transfer_service.dart';
-import 'package:fuel_efficiency_app/features/shared/demo_data_service.dart';
 import 'package:fuel_efficiency_app/features/shared/efficiency_service.dart';
 import 'package:fuel_efficiency_app/features/vehicle/vehicle_model.dart';
 
@@ -102,6 +101,7 @@ class AppDataController extends GetxController {
     if (selectedVehicleId.value.isEmpty && vehicles.isNotEmpty) {
       selectedVehicleId.value = vehicles.first.id;
     }
+    await _purgeLegacyDemoData();
     isHydrated.value = true;
   }
 
@@ -115,8 +115,10 @@ class AppDataController extends GetxController {
       final cloud = await _firestore.fetchUserData(uid);
       if (cloud.hasRemoteData) {
         _applyCloudData(cloud);
-        await _persistAllLocally();
-      } else {
+      }
+      final purged = await _purgeLegacyDemoData();
+      await _persistAllLocally();
+      if (!cloud.hasRemoteData || purged) {
         await _pushAllToCloud();
       }
     } catch (error, stackTrace) {
@@ -133,9 +135,6 @@ class AppDataController extends GetxController {
       if (profile.email.isNotEmpty) userEmail.value = profile.email;
       onboardingComplete.value = profile.onboardingComplete;
       _applySettingsFromCloud(profile.settings);
-      if (profile.demoSeeded) {
-        _storage.write(AppConstants.keyDemoSeeded, true);
-      }
     }
 
     vehicles.assignAll(cloud.vehicles);
@@ -188,7 +187,6 @@ class AppDataController extends GetxController {
       displayName: userName.value,
       email: userEmail.value,
       onboardingComplete: onboardingComplete.value,
-      demoSeeded: _storage.read<bool>(AppConstants.keyDemoSeeded) ?? false,
       settings: _settingsToCloud(),
       vehicles: vehicles.toList(),
       entries: entries.toList(),
@@ -204,9 +202,32 @@ class AppDataController extends GetxController {
       displayName: userName.value,
       email: userEmail.value,
       onboardingComplete: onboardingComplete.value,
-      demoSeeded: _storage.read<bool>(AppConstants.keyDemoSeeded) ?? false,
       settings: _settingsToCloud(),
     );
+  }
+
+  /// Removes bundled demo vehicles/entries from older app versions.
+  Future<bool> _purgeLegacyDemoData() async {
+    final demoVehicleIds = vehicles
+        .where((vehicle) => vehicle.id.startsWith('demo-'))
+        .map((vehicle) => vehicle.id)
+        .toList();
+    if (demoVehicleIds.isEmpty) return false;
+
+    vehicles.removeWhere((vehicle) => vehicle.id.startsWith('demo-'));
+    entries.removeWhere((entry) => demoVehicleIds.contains(entry.vehicleId));
+
+    if (demoVehicleIds.contains(selectedVehicleId.value)) {
+      selectedVehicleId.value = vehicles.isNotEmpty ? vehicles.first.id : '';
+    }
+
+    if (_useCloud) {
+      for (final vehicleId in demoVehicleIds) {
+        await _firestore.deleteVehicle(_uid!, vehicleId);
+      }
+    }
+
+    return true;
   }
 
   Future<void> _persistAllLocally() async {
@@ -236,45 +257,6 @@ class AppDataController extends GetxController {
       case ThemeMode.light:
         return 'light';
     }
-  }
-
-  /// Loads bundled demo vehicles and entries after onboarding completes.
-  /// Preserves the user's session and any vehicle they created during setup.
-  Future<void> loadDemoContent() async {
-    if (_storage.read<bool>(AppConstants.keyDemoSeeded) == true) return;
-
-    final demo = DemoDataService.create();
-    if (defaultFuelPrice.value <= 0) {
-      defaultFuelPrice.value = demo.defaultFuelPrice;
-    }
-    if (defaultElectricityPrice.value <= 0) {
-      defaultElectricityPrice.value = demo.defaultElectricityPrice;
-    }
-
-    final vehicleIds = vehicles.map((v) => v.id).toSet();
-    for (final vehicle in demo.vehicles) {
-      if (!vehicleIds.contains(vehicle.id)) {
-        vehicles.add(vehicle);
-      }
-    }
-
-    final entryIds = entries.map((e) => e.id).toSet();
-    for (final entry in demo.entries) {
-      if (!entryIds.contains(entry.id)) {
-        entries.add(entry);
-      }
-    }
-    entries.sort((a, b) => b.date.compareTo(a.date));
-
-    if (vehicles.any((v) => v.id == 'demo-golf')) {
-      selectedVehicleId.value = 'demo-golf';
-    }
-
-    await _persistSettings();
-    await _persistVehicles();
-    await _persistEntries();
-    await _storage.write(AppConstants.keyDemoSeeded, true);
-    await _syncProfileToCloud();
   }
 
   // ---------------------------------------------------------------------------

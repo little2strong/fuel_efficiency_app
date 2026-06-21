@@ -120,5 +120,10 @@ class HomeController extends GetxController {
   Future<void> selectVehicle(String vehicleId) =>
       _data.selectVehicle(vehicleId);
 
-  void refreshData() => _data.hydrate();
+  Future<void> refreshData() async {
+    await _data.hydrate();
+    if (_data.loggedIn.value) {
+      await _data.syncFromCloud();
+    }
+  }
 }

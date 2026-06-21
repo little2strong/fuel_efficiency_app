@@ -23,7 +23,6 @@ abstract final class AppConstants {
   static const String keyNotifications = 'notifications_enabled';
   static const String keyFuelPrice = 'default_fuel_price';
   static const String keyElectricityPrice = 'default_electricity_price';
-  static const String keyDemoSeeded = 'demo_seeded';
 
   // Defaults
   static const String defaultDistanceUnit = 'Miles';

@@ -222,8 +222,6 @@ class OnboardingController extends GetxController {
           : null,
     );
 
-    await _data.loadDemoContent();
-
     isSubmitting.value = false;
     Get.offAllNamed(AppRoutes.main);
   }

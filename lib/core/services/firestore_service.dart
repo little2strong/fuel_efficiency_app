@@ -10,14 +10,12 @@ class UserCloudProfile {
     this.displayName = '',
     this.email = '',
     this.onboardingComplete = false,
-    this.demoSeeded = false,
     this.settings = const {},
   });
 
   final String displayName;
   final String email;
   final bool onboardingComplete;
-  final bool demoSeeded;
   final Map<String, dynamic> settings;
 
   bool get isEmpty =>
@@ -88,14 +86,12 @@ class FirestoreService extends GetxService {
     required String displayName,
     required String email,
     required bool onboardingComplete,
-    required bool demoSeeded,
     required Map<String, dynamic> settings,
   }) {
     return _userRef(uid).set({
       'displayName': displayName,
       'email': email,
       'onboardingComplete': onboardingComplete,
-      'demoSeeded': demoSeeded,
       'settings': settings,
       'updatedAt': FieldValue.serverTimestamp(),
     }, SetOptions(merge: true));
@@ -132,7 +128,6 @@ class FirestoreService extends GetxService {
     required String displayName,
     required String email,
     required bool onboardingComplete,
-    required bool demoSeeded,
     required Map<String, dynamic> settings,
     required List<VehicleModel> vehicles,
     required List<FuelEntryModel> entries,
@@ -142,7 +137,6 @@ class FirestoreService extends GetxService {
       displayName: displayName,
       email: email,
       onboardingComplete: onboardingComplete,
-      demoSeeded: demoSeeded,
       settings: settings,
     );
 
@@ -182,7 +176,6 @@ class FirestoreService extends GetxService {
       displayName: data['displayName'] as String? ?? '',
       email: data['email'] as String? ?? '',
       onboardingComplete: data['onboardingComplete'] as bool? ?? false,
-      demoSeeded: data['demoSeeded'] as bool? ?? false,
       settings: settings is Map
           ? Map<String, dynamic>.from(settings)
           : const {},
