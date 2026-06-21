@@ -63,5 +63,6 @@ class AuthService extends GetxService {
       name: firebaseUser.displayName ?? data.userName.value,
       email: firebaseUser.email ?? data.userEmail.value,
     );
+    await data.syncFromCloud();
   }
 }
