@@ -7,6 +7,7 @@ import 'package:get_storage/get_storage.dart';
 import 'package:path_provider_platform_interface/path_provider_platform_interface.dart';
 import 'package:plugin_platform_interface/plugin_platform_interface.dart';
 import 'package:fuel_efficiency_app/core/constants/app_constants.dart';
+import 'package:fuel_efficiency_app/core/widgets/app_logo.dart';
 import 'package:fuel_efficiency_app/main.dart';
 
 class _FakePathProvider extends Fake
@@ -53,7 +54,8 @@ void main() {
     await tester.pump();
 
     expect(find.text('Fuel Efficiency'), findsOneWidget);
-    expect(find.byIcon(Icons.speed_rounded), findsOneWidget);
+    expect(find.byType(Image), findsWidgets);
+    expect(find.text('Fuel Efficiency'), findsOneWidget);
 
     await tester.pump(AppConstants.splashDuration);
     await tester.pumpAndSettle();

@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 
 import 'package:fuel_efficiency_app/core/values/app_colors.dart';
+import 'package:fuel_efficiency_app/core/widgets/app_logo.dart';
 import 'package:fuel_efficiency_app/core/widgets/app_text_field.dart';
 import 'package:fuel_efficiency_app/core/widgets/energy_mode_selector.dart';
 import 'package:fuel_efficiency_app/features/onboarding/onboarding_controller.dart';
@@ -94,19 +95,7 @@ class _WelcomeStep extends StatelessWidget {
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           const SizedBox(height: 12),
-          Container(
-            height: 64,
-            width: 64,
-            decoration: BoxDecoration(
-              color: AppColors.primarySurface,
-              borderRadius: BorderRadius.circular(18),
-            ),
-            child: const Icon(
-              Icons.speed_rounded,
-              color: AppColors.primary,
-              size: 34,
-            ),
-          ),
+          const AppLogo(size: 64),
           const SizedBox(height: 22),
           Text('Welcome!', style: theme.textTheme.headlineMedium),
           const SizedBox(height: 8),

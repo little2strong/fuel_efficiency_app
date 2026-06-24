@@ -5,6 +5,7 @@ import 'package:fuel_efficiency_app/app/routes/app_routes.dart';
 import 'package:fuel_efficiency_app/core/utils/formatters.dart';
 import 'package:fuel_efficiency_app/core/values/app_colors.dart';
 import 'package:fuel_efficiency_app/core/widgets/app_card.dart';
+import 'package:fuel_efficiency_app/core/widgets/app_logo.dart';
 import 'package:fuel_efficiency_app/features/settings/settings_controller.dart';
 
 class SettingsView extends GetView<SettingsController> {
@@ -408,11 +409,7 @@ class SettingsView extends GetView<SettingsController> {
       context: context,
       applicationName: controller.appName,
       applicationVersion: 'Version ${controller.appVersion}',
-      applicationIcon: const Icon(
-        Icons.speed_rounded,
-        color: AppColors.primary,
-        size: 40,
-      ),
+      applicationIcon: const AppLogo(size: 48),
       children: const [Text('Track real efficiency. See the real difference.')],
     );
   }

@@ -3,6 +3,7 @@ import 'package:get/get.dart';
 
 import 'package:fuel_efficiency_app/core/constants/app_constants.dart';
 import 'package:fuel_efficiency_app/core/values/app_colors.dart';
+import 'package:fuel_efficiency_app/core/widgets/app_logo.dart';
 import 'package:fuel_efficiency_app/features/splash/splash_controller.dart';
 
 class SplashView extends GetView<SplashController> {
@@ -26,25 +27,15 @@ class SplashView extends GetView<SplashController> {
               child: Column(
                 mainAxisSize: MainAxisSize.min,
                 children: [
-                  Container(
-                    height: 110,
-                    width: 110,
-                    decoration: BoxDecoration(
-                      color: Colors.white,
-                      borderRadius: BorderRadius.circular(28),
-                      boxShadow: [
-                        BoxShadow(
-                          color: Colors.black.withValues(alpha: 0.15),
-                          blurRadius: 24,
-                          offset: const Offset(0, 10),
-                        ),
-                      ],
-                    ),
-                    child: const Icon(
-                      Icons.speed_rounded,
-                      size: 60,
-                      color: AppColors.primary,
-                    ),
+                  const AppLogo(
+                    size: 110,
+                    elevation: [
+                      BoxShadow(
+                        color: Color(0x26000000),
+                        blurRadius: 24,
+                        offset: Offset(0, 10),
+                      ),
+                    ],
                   ),
                   const SizedBox(height: 26),
                   Text(
