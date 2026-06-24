@@ -40,6 +40,15 @@ class AuthService extends GetxService {
       await credential.user?.reload();
     }
 
+    // Best-effort: send a verification email. Never block sign-up if it fails
+    // (e.g. transient network error) — the account is still created.
+    try {
+      final user = credential.user;
+      if (user != null && !user.emailVerified) {
+        await user.sendEmailVerification();
+      }
+    } catch (_) {}
+
     return credential;
   }
 

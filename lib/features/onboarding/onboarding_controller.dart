@@ -193,48 +193,82 @@ class OnboardingController extends GetxController {
 
   Future<void> finish() async {
     if (!(vehicleFormKey.currentState?.validate() ?? false)) return;
-    isSubmitting.value = true;
 
     final user = _auth.currentUser;
-    final displayName = user?.displayName?.trim().isNotEmpty == true
-        ? user!.displayName!.trim()
-        : (nameController.text.trim().isEmpty
-              ? 'Driver'
-              : nameController.text.trim());
-    final email = user?.email?.trim().isNotEmpty == true
-        ? user!.email!.trim()
-        : emailController.text.trim();
+    if (user == null) {
+      Get.snackbar(
+        'Sign in required',
+        'Please sign in before completing setup.',
+        snackPosition: SnackPosition.BOTTOM,
+      );
+      step.value = 1;
+      return;
+    }
 
-    await _data.updateSession(
-      completedOnboarding: true,
-      loggedInState: true,
-      name: displayName,
-      email: email,
-      uid: user?.uid,
-    );
+    isSubmitting.value = true;
 
-    await _data.addVehicle(
-      name: vehicleNameController.text.trim(),
-      energyMode: selectedMode.value,
-      vehicleType: selectedVehicleType.value,
-      makeModel: makeModelController.text.trim(),
-      year: int.tryParse(yearController.text.trim()) ?? DateTime.now().year,
-      odometer: double.tryParse(odometerController.text.trim()) ?? 0,
-      manufacturerMpgClaim: selectedMode.value.usesFuel
-          ? double.tryParse(claimedMpgController.text.trim())
-          : null,
-      manufacturerMiPerKwhClaim: selectedMode.value.usesCharge
-          ? double.tryParse(claimedMiPerKwhController.text.trim())
-          : null,
-      batteryKwhCapacity: selectedMode.value.usesCharge
-          ? double.tryParse(batteryCapacityController.text.trim())
-          : null,
-    );
+    try {
+      final displayName = user.displayName?.trim().isNotEmpty == true
+          ? user.displayName!.trim()
+          : (nameController.text.trim().isEmpty
+                ? 'Driver'
+                : nameController.text.trim());
+      final email = user.email?.trim().isNotEmpty == true
+          ? user.email!.trim()
+          : emailController.text.trim();
 
-    await _data.syncFromCloud();
+      await _data.syncAuthUser(
+        uid: user.uid,
+        name: displayName,
+        email: email,
+      );
 
-    isSubmitting.value = false;
-    if (!isClosed) Get.offAllNamed(AppRoutes.main);
+      await _data.updateSession(
+        completedOnboarding: true,
+        loggedInState: true,
+        name: displayName,
+        email: email,
+        uid: user.uid,
+      );
+
+      await _data.addVehicle(
+        name: vehicleNameController.text.trim(),
+        energyMode: selectedMode.value,
+        vehicleType: selectedVehicleType.value,
+        makeModel: makeModelController.text.trim(),
+        year: int.tryParse(yearController.text.trim()) ?? DateTime.now().year,
+        odometer: double.tryParse(odometerController.text.trim()) ?? 0,
+        manufacturerMpgClaim: selectedMode.value.usesFuel
+            ? double.tryParse(claimedMpgController.text.trim())
+            : null,
+        manufacturerMiPerKwhClaim: selectedMode.value.usesCharge
+            ? double.tryParse(claimedMiPerKwhController.text.trim())
+            : null,
+        batteryKwhCapacity: selectedMode.value.usesCharge
+            ? double.tryParse(batteryCapacityController.text.trim())
+            : null,
+      );
+
+      final synced = await _data.pushToCloud();
+      if (!synced && _data.cloudSyncError.value.isNotEmpty) {
+        Get.snackbar(
+          'Saved locally',
+          'Cloud sync failed. Data is on this device — pull to refresh later.',
+          snackPosition: SnackPosition.BOTTOM,
+          duration: const Duration(seconds: 4),
+        );
+      }
+
+      if (!isClosed) Get.offAllNamed(AppRoutes.main);
+    } catch (error) {
+      Get.snackbar(
+        'Setup failed',
+        authErrorMessage(error),
+        snackPosition: SnackPosition.BOTTOM,
+      );
+    } finally {
+      isSubmitting.value = false;
+    }
   }
 
   @override

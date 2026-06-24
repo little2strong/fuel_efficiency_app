@@ -57,9 +57,14 @@ class FirestoreService extends GetxService {
   Future<FirestoreService> init() async => this;
 
   Future<UserCloudData> fetchUserData(String uid) async {
-    final userSnap = await _userRef(uid).get();
-    final vehiclesSnap = await _vehiclesRef(uid).get();
-    final entriesSnap = await _entriesRef(uid).get();
+    final results = await Future.wait([
+      _userRef(uid).get(),
+      _vehiclesRef(uid).get(),
+      _entriesRef(uid).get(),
+    ]);
+    final userSnap = results[0] as DocumentSnapshot<Map<String, dynamic>>;
+    final vehiclesSnap = results[1] as QuerySnapshot<Map<String, dynamic>>;
+    final entriesSnap = results[2] as QuerySnapshot<Map<String, dynamic>>;
 
     UserCloudProfile? profile;
     if (userSnap.exists) {
@@ -105,11 +110,12 @@ class FirestoreService extends GetxService {
     final batch = _db.batch();
     batch.delete(_vehiclesRef(uid).doc(vehicleId));
 
-    final relatedEntries = await _entriesRef(uid).get();
+    // Query only this vehicle's entries instead of scanning the collection.
+    final relatedEntries = await _entriesRef(
+      uid,
+    ).where('vehicleId', isEqualTo: vehicleId).get();
     for (final doc in relatedEntries.docs) {
-      if (doc.data()['vehicleId'] == vehicleId) {
-        batch.delete(doc.reference);
-      }
+      batch.delete(doc.reference);
     }
 
     await batch.commit();

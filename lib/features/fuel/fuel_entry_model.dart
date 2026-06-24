@@ -16,6 +16,7 @@ class FuelEntryModel {
     this.fuelGrade,
     this.fullTank = true,
     this.note,
+    this.updatedAt,
   });
 
   static const storageKey = 'fuel_entries';
@@ -35,6 +36,13 @@ class FuelEntryModel {
   final String? fuelGrade;
   final bool fullTank;
   final String? note;
+
+  /// Last time this record was created/modified. Used for cloud merge
+  /// (last-write-wins) so offline edits are never silently overwritten.
+  final DateTime? updatedAt;
+
+  /// Stamp used to compare two versions of the same record during sync.
+  DateTime get syncStamp => updatedAt ?? date;
 
   double get totalCost => fuelCost + electricityCost;
 
@@ -63,6 +71,7 @@ class FuelEntryModel {
     bool? fullTank,
     String? note,
     bool clearNote = false,
+    DateTime? updatedAt,
   }) {
     return FuelEntryModel(
       id: id ?? this.id,
@@ -78,6 +87,7 @@ class FuelEntryModel {
       fuelGrade: clearFuelGrade ? null : fuelGrade ?? this.fuelGrade,
       fullTank: fullTank ?? this.fullTank,
       note: clearNote ? null : note ?? this.note,
+      updatedAt: updatedAt ?? this.updatedAt,
     );
   }
 
@@ -95,6 +105,7 @@ class FuelEntryModel {
     'fuelGrade': fuelGrade,
     'fullTank': fullTank,
     'note': note,
+    'updatedAt': updatedAt?.toIso8601String(),
   };
 
   factory FuelEntryModel.fromJson(Map<String, dynamic> json) {
@@ -115,7 +126,13 @@ class FuelEntryModel {
       fuelGrade: json['fuelGrade'] as String?,
       fullTank: json['fullTank'] as bool? ?? true,
       note: json['note'] as String?,
+      updatedAt: _parseDate(json['updatedAt']),
     );
+  }
+
+  static DateTime? _parseDate(dynamic value) {
+    if (value is String && value.isNotEmpty) return DateTime.tryParse(value);
+    return null;
   }
 
   static List<FuelEntryModel> loadAll(LocalStorageProvider storage) {

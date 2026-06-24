@@ -85,7 +85,7 @@ class DashboardTab extends GetView<HomeController> {
                   const SizedBox(width: 12),
                   Expanded(
                     child: StatCard(
-                      label: 'Month Miles',
+                      label: 'Month $unit',
                       value: Formatters.integer(controller.monthlyDistance),
                       icon: Icons.calendar_month_rounded,
                     ),

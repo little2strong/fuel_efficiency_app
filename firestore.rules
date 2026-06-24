@@ -2,15 +2,57 @@ rules_version = '2';
 
 service cloud.firestore {
   match /databases/{database}/documents {
+    function isOwner(userId) {
+      return request.auth != null && request.auth.uid == userId;
+    }
+
+    function nonNegativeNumber(value) {
+      return value is number && value >= 0;
+    }
+
+    function validEntry(data) {
+      return data.keys().hasOnly([
+               'id', 'vehicleId', 'date', 'mode', 'distance', 'liters', 'kwh',
+               'fuelCost', 'electricityCost', 'odometer', 'fuelGrade',
+               'fullTank', 'note', 'updatedAt'
+             ])
+             && data.id is string
+             && data.vehicleId is string
+             && data.mode is string
+             && nonNegativeNumber(data.distance)
+             && nonNegativeNumber(data.liters)
+             && nonNegativeNumber(data.kwh)
+             && nonNegativeNumber(data.fuelCost)
+             && nonNegativeNumber(data.electricityCost)
+             && nonNegativeNumber(data.odometer);
+    }
+
+    function validVehicle(data) {
+      return data.keys().hasOnly([
+               'id', 'name', 'energyMode', 'vehicleType', 'makeModel', 'year',
+               'manufacturerMpgClaim', 'manufacturerMiPerKwhClaim',
+               'batteryKwhCapacity', 'odometer', 'updatedAt'
+             ])
+             && data.id is string
+             && data.name is string
+             && data.energyMode is string
+             && data.year is number
+             && nonNegativeNumber(data.odometer);
+    }
+
     match /users/{userId} {
-      allow read, write: if request.auth != null && request.auth.uid == userId;
+      allow read, write: if isOwner(userId);
 
       match /vehicles/{vehicleId} {
-        allow read, write: if request.auth != null && request.auth.uid == userId;
+        allow read, delete: if isOwner(userId);
+        allow create, update: if isOwner(userId)
+                              && validVehicle(request.resource.data);
       }
 
       match /entries/{entryId} {
-        allow read, write: if request.auth != null && request.auth.uid == userId;
+        allow read, delete: if isOwner(userId);
+        allow create, update: if isOwner(userId)
+                              && validEntry(request.resource.data);
       }
     }
   }

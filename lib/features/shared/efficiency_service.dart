@@ -269,12 +269,18 @@ class EfficiencyService {
       average = costPerDistance(totalCost: totalCost, distance: totalDistance);
     }
 
+    // For cost-per-distance a *lower* value is better, so best/worst must be
+    // inverted relative to efficiency metrics (where higher is better).
+    final lowerIsBetter = metric == EfficiencyMetric.costPerDistance;
+    final maxValue = values.reduce((a, b) => a > b ? a : b);
+    final minValue = values.reduce((a, b) => a < b ? a : b);
+
     return EfficiencyStats(
       average: average,
 
-      best: values.reduce((a, b) => a > b ? a : b),
+      best: lowerIsBetter ? minValue : maxValue,
 
-      worst: values.reduce((a, b) => a < b ? a : b),
+      worst: lowerIsBetter ? maxValue : minValue,
 
       totalDistance: totalDistance,
 

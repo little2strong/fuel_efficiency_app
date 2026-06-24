@@ -13,6 +13,7 @@ class VehicleModel {
     this.manufacturerMiPerKwhClaim,
     this.batteryKwhCapacity,
     this.odometer = 0,
+    this.updatedAt,
   });
 
   static const storageKey = 'vehicles';
@@ -28,6 +29,12 @@ class VehicleModel {
   final double? batteryKwhCapacity;
   final double odometer;
 
+  /// Last time this record was created/modified. Used for cloud merge.
+  final DateTime? updatedAt;
+
+  /// Stamp used to compare two versions of the same record during sync.
+  DateTime get syncStamp => updatedAt ?? DateTime.fromMillisecondsSinceEpoch(0);
+
   VehicleModel copyWith({
     String? id,
     String? name,
@@ -42,6 +49,7 @@ class VehicleModel {
     double? batteryKwhCapacity,
     bool clearBatteryCapacity = false,
     double? odometer,
+    DateTime? updatedAt,
   }) {
     return VehicleModel(
       id: id ?? this.id,
@@ -60,6 +68,7 @@ class VehicleModel {
           ? null
           : batteryKwhCapacity ?? this.batteryKwhCapacity,
       odometer: odometer ?? this.odometer,
+      updatedAt: updatedAt ?? this.updatedAt,
     );
   }
 
@@ -74,6 +83,7 @@ class VehicleModel {
     'manufacturerMiPerKwhClaim': manufacturerMiPerKwhClaim,
     'batteryKwhCapacity': batteryKwhCapacity,
     'odometer': odometer,
+    'updatedAt': updatedAt?.toIso8601String(),
   };
 
   factory VehicleModel.fromJson(Map<String, dynamic> json) {
@@ -91,7 +101,13 @@ class VehicleModel {
           ?.toDouble(),
       batteryKwhCapacity: (json['batteryKwhCapacity'] as num?)?.toDouble(),
       odometer: (json['odometer'] as num?)?.toDouble() ?? 0,
+      updatedAt: _parseDate(json['updatedAt']),
     );
+  }
+
+  static DateTime? _parseDate(dynamic value) {
+    if (value is String && value.isNotEmpty) return DateTime.tryParse(value);
+    return null;
   }
 
   static List<VehicleModel> loadAll(LocalStorageProvider storage) {

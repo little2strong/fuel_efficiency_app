@@ -26,6 +26,10 @@ class SettingsController extends GetxController {
 
   bool get isDarkMode => _data.themeMode.value == ThemeMode.dark;
 
+  /// Short label for the active volume unit (e.g. "L" or "gal").
+  String get volumeUnitShort =>
+      _data.volumeUnit.value.toLowerCase().startsWith('g') ? 'gal' : 'L';
+
   Future<void> setDistanceUnit(String value) =>
       _data.updateSettings(newDistanceUnit: value);
 

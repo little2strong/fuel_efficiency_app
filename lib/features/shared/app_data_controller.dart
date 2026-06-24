@@ -1,3 +1,4 @@
+import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 
@@ -50,9 +51,16 @@ class AppDataController extends GetxController {
   final RxString selectedVehicleId = ''.obs;
   final RxBool isHydrated = false.obs;
   final RxBool isSyncing = false.obs;
+  final RxString cloudSyncError = ''.obs;
 
-  String? get _uid => userId.value.isEmpty ? null : userId.value;
-  bool get _useCloud => _uid != null;
+  /// Prefer the live Firebase Auth uid so Firestore rules match the signed-in user.
+  String? get _uid {
+    final authUid = FirebaseAuth.instance.currentUser?.uid;
+    if (authUid != null && authUid.isNotEmpty) return authUid;
+    return userId.value.isEmpty ? null : userId.value;
+  }
+
+  bool get _useCloud => FirebaseAuth.instance.currentUser != null && _uid != null;
 
   @override
   void onInit() {
@@ -116,30 +124,103 @@ class AppDataController extends GetxController {
   }
 
   /// Pulls cloud data after sign-in, or uploads local data on first sync.
-  Future<void> syncFromCloud() async {
+  Future<bool> syncFromCloud() async {
     final uid = _uid;
-    if (uid == null) return;
+    if (uid == null) return false;
 
     isSyncing.value = true;
+    cloudSyncError.value = '';
+    var success = true;
+
     try {
-      final cloud = await _firestore.fetchUserData(uid);
+      UserCloudData? cloud;
+      try {
+        cloud = await _firestore.fetchUserData(uid);
+      } catch (error, stackTrace) {
+        AppLogger.error('Cloud fetch failed', error, stackTrace);
+        cloud = null;
+        success = false;
+      }
+
+      // If the fetch failed we must not push: it could overwrite good cloud
+      // data with a partial local view (or fail again). Bail out safely.
+      if (cloud == null) {
+        cloudSyncError.value = 'Could not sync with the cloud.';
+        return false;
+      }
+
+      final cloudVehicleStamps = {
+        for (final v in cloud.vehicles) v.id: v.syncStamp,
+      };
+      final cloudEntryStamps = {
+        for (final e in cloud.entries) e.id: e.syncStamp,
+      };
+
       if (cloud.hasRemoteData) {
         _applyCloudData(cloud);
       }
+
       final legacyDemoIds = _legacyDemoVehicleIds();
       final purged = _purgeLegacyDemoDataLocal();
       await _persistAllLocally();
+
       if (purged && legacyDemoIds.isNotEmpty) {
         await _purgeLegacyDemoDataCloud(legacyDemoIds);
       }
-      if (!cloud.hasRemoteData || purged) {
-        await _pushAllToCloud();
+
+      // Push only when the cloud is missing a record or has an older version of
+      // one, instead of re-uploading the entire dataset on every sync.
+      bool vehicleNeedsPush(VehicleModel v) {
+        final remote = cloudVehicleStamps[v.id];
+        return remote == null || v.syncStamp.isAfter(remote);
+      }
+
+      bool entryNeedsPush(FuelEntryModel e) {
+        final remote = cloudEntryStamps[e.id];
+        return remote == null || e.syncStamp.isAfter(remote);
+      }
+
+      final hasLocalChanges =
+          vehicles.any(vehicleNeedsPush) || entries.any(entryNeedsPush);
+      final shouldPush = !cloud.hasRemoteData || purged || hasLocalChanges;
+      if (shouldPush) {
+        final pushed = await pushToCloud();
+        success = success && pushed;
       }
     } catch (error, stackTrace) {
       AppLogger.error('Cloud sync failed', error, stackTrace);
+      cloudSyncError.value = 'Could not sync with the cloud.';
+      success = false;
     } finally {
       isSyncing.value = false;
     }
+
+    return success;
+  }
+
+  /// Uploads the current local state to Firestore.
+  Future<bool> pushToCloud() async {
+    final uid = _uid;
+    if (uid == null) return false;
+
+    cloudSyncError.value = '';
+    final ok = await _runCloud(
+      () => _firestore.pushAllData(
+        uid: uid,
+        displayName: userName.value,
+        email: userEmail.value,
+        onboardingComplete: onboardingComplete.value,
+        settings: _settingsToCloud(),
+        vehicles: vehicles.toList(),
+        entries: entries.toList(),
+      ),
+      'Cloud full sync failed',
+    );
+
+    if (!ok) {
+      cloudSyncError.value = 'Could not save to the cloud.';
+    }
+    return ok;
   }
 
   void _applyCloudData(UserCloudData cloud) {
@@ -151,16 +232,40 @@ class AppDataController extends GetxController {
       _applySettingsFromCloud(profile.settings);
     }
 
-    vehicles.assignAll(cloud.vehicles);
+    // Merge by id (last-write-wins) instead of overwriting. This preserves
+    // records created locally while offline that have not reached the cloud yet.
+    final mergedVehicles = {for (final v in vehicles) v.id: v};
+    for (final remote in cloud.vehicles) {
+      final local = mergedVehicles[remote.id];
+      mergedVehicles[remote.id] =
+          (local == null || !local.syncStamp.isAfter(remote.syncStamp))
+          ? remote
+          : local;
+    }
+
+    final mergedEntries = {for (final e in entries) e.id: e};
+    for (final remote in cloud.entries) {
+      final local = mergedEntries[remote.id];
+      mergedEntries[remote.id] =
+          (local == null || !local.syncStamp.isAfter(remote.syncStamp))
+          ? remote
+          : local;
+    }
+
+    vehicles.assignAll(mergedVehicles.values);
     entries
-      ..assignAll(cloud.entries)
+      ..assignAll(mergedEntries.values)
       ..sort((a, b) => b.date.compareTo(a.date));
 
     final selected = profile?.settings['selectedVehicleId'] as String?;
-    if (selected != null && selected.isNotEmpty) {
+    if (selected != null &&
+        selected.isNotEmpty &&
+        vehicles.any((v) => v.id == selected)) {
       selectedVehicleId.value = selected;
-    } else if (selectedVehicleId.value.isEmpty && vehicles.isNotEmpty) {
-      selectedVehicleId.value = vehicles.first.id;
+    }
+    if (selectedVehicleId.value.isEmpty ||
+        !vehicles.any((v) => v.id == selectedVehicleId.value)) {
+      selectedVehicleId.value = vehicles.isNotEmpty ? vehicles.first.id : '';
     }
   }
 
@@ -192,29 +297,11 @@ class AppDataController extends GetxController {
     'selectedVehicleId': selectedVehicleId.value,
   };
 
-  Future<void> _pushAllToCloud() async {
+  Future<bool> _syncProfileToCloud() async {
     final uid = _uid;
-    if (uid == null) return;
+    if (uid == null) return false;
 
-    await _runCloud(
-      () => _firestore.pushAllData(
-        uid: uid,
-        displayName: userName.value,
-        email: userEmail.value,
-        onboardingComplete: onboardingComplete.value,
-        settings: _settingsToCloud(),
-        vehicles: vehicles.toList(),
-        entries: entries.toList(),
-      ),
-      'Cloud full sync failed',
-    );
-  }
-
-  Future<void> _syncProfileToCloud() async {
-    final uid = _uid;
-    if (uid == null) return;
-
-    await _runCloud(
+    return _runCloud(
       () => _firestore.saveUserProfile(
         uid: uid,
         displayName: userName.value,
@@ -226,15 +313,18 @@ class AppDataController extends GetxController {
     );
   }
 
-  Future<void> _runCloud(
+  Future<bool> _runCloud(
     Future<void> Function() action,
     String errorLabel,
   ) async {
-    if (!_useCloud) return;
+    if (!_useCloud) return false;
     try {
       await action();
+      return true;
     } catch (error, stackTrace) {
       AppLogger.error(errorLabel, error, stackTrace);
+      cloudSyncError.value = 'Cloud save failed. Check your connection.';
+      return false;
     }
   }
 
@@ -425,6 +515,9 @@ class AppDataController extends GetxController {
     double? newFuelPrice,
     double? newElectricityPrice,
   }) async {
+    final oldDistanceUnit = distanceUnit.value;
+    final oldVolumeUnit = volumeUnit.value;
+
     if (newDistanceUnit != null) distanceUnit.value = newDistanceUnit;
     if (newVolumeUnit != null) volumeUnit.value = newVolumeUnit;
     if (newCurrencySymbol != null) currencySymbol.value = newCurrencySymbol;
@@ -437,8 +530,95 @@ class AppDataController extends GetxController {
     if (newElectricityPrice != null) {
       defaultElectricityPrice.value = newElectricityPrice;
     }
+
+    final convertedData = await _convertStoredUnits(
+      oldDistanceUnit: oldDistanceUnit,
+      newDistanceUnit: distanceUnit.value,
+      oldVolumeUnit: oldVolumeUnit,
+      newVolumeUnit: volumeUnit.value,
+    );
+
     await _persistSettings();
-    await _syncProfileToCloud();
+
+    if (convertedData) {
+      // Stored records changed, so re-upload them too (not just the profile).
+      if (_useCloud) await pushToCloud();
+    } else {
+      await _syncProfileToCloud();
+    }
+  }
+
+  /// Rescales stored distances, odometers and volumes when the user switches
+  /// units so historical records stay numerically consistent with the new unit
+  /// (e.g. Miles -> Kilometers). Returns true if any record was changed.
+  Future<bool> _convertStoredUnits({
+    required String oldDistanceUnit,
+    required String newDistanceUnit,
+    required String oldVolumeUnit,
+    required String newVolumeUnit,
+  }) async {
+    final distanceFactor = _distanceFactor(oldDistanceUnit, newDistanceUnit);
+    final volumeFactor = _volumeFactor(oldVolumeUnit, newVolumeUnit);
+    final distanceChanged = distanceFactor != 1;
+    final volumeChanged = volumeFactor != 1;
+    if (!distanceChanged && !volumeChanged) return false;
+
+    final now = DateTime.now();
+
+    if (distanceChanged) {
+      for (var i = 0; i < vehicles.length; i++) {
+        vehicles[i] = vehicles[i].copyWith(
+          odometer: vehicles[i].odometer * distanceFactor,
+          updatedAt: now,
+        );
+      }
+      vehicles.refresh();
+    }
+
+    if (distanceChanged || volumeChanged) {
+      for (var i = 0; i < entries.length; i++) {
+        entries[i] = entries[i].copyWith(
+          distance: distanceChanged
+              ? entries[i].distance * distanceFactor
+              : null,
+          odometer: distanceChanged
+              ? entries[i].odometer * distanceFactor
+              : null,
+          liters: volumeChanged ? entries[i].liters * volumeFactor : null,
+          updatedAt: now,
+        );
+      }
+      entries.refresh();
+    }
+
+    if (volumeChanged && defaultFuelPrice.value > 0) {
+      // Price is stored per volume unit; rescale so auto-filled costs match.
+      defaultFuelPrice.value = defaultFuelPrice.value / volumeFactor;
+    }
+
+    await _persistVehicles();
+    await _persistEntries();
+    return true;
+  }
+
+  /// Multiplier to convert a distance value from [from] unit into [to] unit.
+  double _distanceFactor(String from, String to) {
+    final fromKm = from.toLowerCase().startsWith('k');
+    final toKm = to.toLowerCase().startsWith('k');
+    if (fromKm == toKm) return 1;
+    return fromKm
+        ? AppConstants.milesPerKilometer // km -> miles
+        : AppConstants.kilometersPerMile; // miles -> km
+  }
+
+  /// Multiplier to convert a volume value from [from] unit into [to] unit.
+  double _volumeFactor(String from, String to) {
+    final fromGallons = from.toLowerCase().startsWith('g');
+    final toGallons = to.toLowerCase().startsWith('g');
+    if (fromGallons == toGallons) return 1;
+    return fromGallons
+        ? AppConstants.usGallonInLitres // gallons -> litres
+        : 1 / AppConstants.usGallonInLitres; // litres -> gallons
   }
 
   Future<void> toggleDarkMode(bool enabled) =>
@@ -475,15 +655,18 @@ class AppDataController extends GetxController {
       manufacturerMiPerKwhClaim: manufacturerMiPerKwhClaim,
       batteryKwhCapacity: batteryKwhCapacity,
       odometer: odometer,
+      updatedAt: DateTime.now(),
     );
     vehicles.add(vehicle);
     await _persistVehicles();
-    await selectVehicle(vehicle.id);
+    selectedVehicleId.value = vehicle.id;
+    await _persistSettings();
     if (_useCloud) {
       await _runCloud(
         () => _firestore.saveVehicle(_uid!, vehicle),
         'Cloud vehicle save failed',
       );
+      await _syncProfileToCloud();
     }
     return vehicle;
   }
@@ -491,6 +674,7 @@ class AppDataController extends GetxController {
   Future<void> updateVehicle(VehicleModel updated) async {
     final index = vehicles.indexWhere((v) => v.id == updated.id);
     if (index == -1) return;
+    updated = updated.copyWith(updatedAt: DateTime.now());
     vehicles[index] = updated;
     vehicles.refresh();
     await _persistVehicles();
@@ -550,6 +734,7 @@ class AppDataController extends GetxController {
       fuelGrade: fuelGrade,
       fullTank: fullTank,
       note: note,
+      updatedAt: DateTime.now(),
     );
     entries
       ..add(entry)
@@ -568,6 +753,7 @@ class AppDataController extends GetxController {
   Future<void> updateEntry(FuelEntryModel updated) async {
     final index = entries.indexWhere((e) => e.id == updated.id);
     if (index == -1) return;
+    updated = updated.copyWith(updatedAt: DateTime.now());
     entries[index] = updated;
     entries.sort((a, b) => b.date.compareTo(a.date));
     entries.refresh();
@@ -606,7 +792,10 @@ class AppDataController extends GetxController {
         .map((e) => e.odometer)
         .reduce((a, b) => a > b ? a : b);
     if (vehicles[index].odometer == latestOdometer) return;
-    vehicles[index] = vehicles[index].copyWith(odometer: latestOdometer);
+    vehicles[index] = vehicles[index].copyWith(
+      odometer: latestOdometer,
+      updatedAt: DateTime.now(),
+    );
     vehicles.refresh();
     await _persistVehicles();
     if (_useCloud) {
@@ -788,7 +977,7 @@ class AppDataController extends GetxController {
     await _persistVehicles();
     await _persistEntries();
     await _persistSettings();
-    if (_useCloud) await _pushAllToCloud();
+    if (_useCloud) await pushToCloud();
     AppLogger.info('Imported $imported new entries.');
     return imported;
   }

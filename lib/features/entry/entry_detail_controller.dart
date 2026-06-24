@@ -16,6 +16,7 @@ class EntryDetailController extends GetxController {
 
   RxString get currencySymbol => _data.currencySymbol;
   RxString get distanceUnit => _data.distanceUnit;
+  RxString get volumeUnit => _data.volumeUnit;
   EfficiencyService get efficiency => _data.efficiency;
 
   @override
@@ -41,6 +42,7 @@ class EntryDetailController extends GetxController {
       distance: e.distance,
       litres: e.liters,
       distanceUnit: distanceUnit.value,
+      volumeUnit: volumeUnit.value,
     );
   }
 

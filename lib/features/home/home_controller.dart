@@ -1,6 +1,7 @@
 import 'package:get/get.dart';
 
 import 'package:fuel_efficiency_app/app/routes/app_routes.dart';
+import 'package:fuel_efficiency_app/core/services/auth_service.dart';
 import 'package:fuel_efficiency_app/features/fuel/fuel_entry_model.dart';
 import 'package:fuel_efficiency_app/features/main/main_controller.dart';
 import 'package:fuel_efficiency_app/features/shared/app_data_controller.dart';
@@ -122,8 +123,15 @@ class HomeController extends GetxController {
 
   Future<void> refreshData() async {
     await _data.hydrate();
-    if (_data.loggedIn.value) {
-      await _data.syncFromCloud();
+    if (_data.loggedIn.value && Get.find<AuthService>().currentUser != null) {
+      final ok = await _data.syncFromCloud();
+      if (!ok && _data.cloudSyncError.value.isNotEmpty) {
+        Get.snackbar(
+          'Sync issue',
+          _data.cloudSyncError.value,
+          snackPosition: SnackPosition.BOTTOM,
+        );
+      }
     }
   }
 }

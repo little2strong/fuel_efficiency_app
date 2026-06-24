@@ -111,7 +111,7 @@ class SettingsView extends GetView<SettingsController> {
                 icon: Icons.bolt_rounded,
                 title: 'Default Energy Prices',
                 subtitle:
-                    'Fuel ${Formatters.currency(controller.fuelPrice.value, controller.currencySymbol.value)}/L • '
+                    'Fuel ${Formatters.currency(controller.fuelPrice.value, controller.currencySymbol.value)}/${controller.volumeUnitShort} • '
                     'Electricity ${Formatters.currency(controller.electricityPrice.value, controller.currencySymbol.value)}/kWh',
                 onTap: () => _editPrices(context),
               ),
@@ -274,7 +274,10 @@ class SettingsView extends GetView<SettingsController> {
           ),
         ],
       ),
-    );
+    ).whenComplete(() {
+      nameCtrl.dispose();
+      emailCtrl.dispose();
+    });
   }
 
   void _editPrices(BuildContext context) {
@@ -302,7 +305,7 @@ class SettingsView extends GetView<SettingsController> {
               ),
               decoration: InputDecoration(
                 labelText:
-                    'Fuel price / litre (${controller.currencySymbol.value})',
+                    'Fuel price / ${controller.volumeUnitShort} (${controller.currencySymbol.value})',
               ),
             ),
             const SizedBox(height: 12),
@@ -335,7 +338,10 @@ class SettingsView extends GetView<SettingsController> {
           ),
         ],
       ),
-    );
+    ).whenComplete(() {
+      fuelCtrl.dispose();
+      elecCtrl.dispose();
+    });
   }
 
   void _importData(BuildContext context) {
@@ -373,7 +379,7 @@ class SettingsView extends GetView<SettingsController> {
           ),
         ],
       ),
-    );
+    ).whenComplete(textCtrl.dispose);
   }
 
   void _privacyDialog(BuildContext context) {
@@ -382,9 +388,10 @@ class SettingsView extends GetView<SettingsController> {
       builder: (dialogContext) => AlertDialog(
         title: const Text('Privacy Policy'),
         content: const Text(
-          'All data is stored locally on your device and is never uploaded or '
-          'shared with anyone. Exports only leave the device when you choose '
-          'to share them.',
+          'Your data is stored locally on your device and securely synced to '
+          'your private Firebase account so it is available across your '
+          'devices. Only you can access it. Exported files are shared only when '
+          'you explicitly choose to share them.',
         ),
         actions: [
           FilledButton(
